@@ -1,0 +1,32 @@
+The exam has been changed it seems for the past two years. I will cathalog my progress on how i studied for the new exam.
+Exam 12/06/2026 FIND THE MODEL IN THE FOLDER.
+RETAKE IS 5/07/2026
+1.I will be programming an app to help us with the existent exercises from all models with multiple choice to help us memorise the concepts.
+2.I will resketch all course data as small as possible.
+3.Redoing all exams currently.
+4.Observation:It seems the teacher focuses on more code now than theory. So instead of writing theory questions, I will summarise all the theorethical elements in only one page(instead of 2) and dedicate 1 page for all exercises on the platform, laboratory, seminar.
+
+AVAILABLE DATES:
+13:Free day go back to Sv
+14:file:///D:/ALLYEARS/Year%201/Semester%202/Sisteme%20de%20operare/course/teaching-notes.pdf
+READ FIRST AND SECOND CHAPTER AND MAKE VIRTUAL NOTES 
+15:READ 3rd CHAPTER AND MAKE NOTES
+16:SOLVE ALL LAPS RELATED TO UNIX SHELL PROGRAMMING  
+17:READ 4th CHAPTER AND MAKE NOTES
+18:FINALISE FIRST 2 SEMINARS 
+19:SOLVE AGAIN ALL EXERCISES FROM THE EXAM MODELS RELATED TO AWK SED GREP 
+20:READ 5th and 6th AND SKETCH THEM
+21:SOLVE ALL PREVIOUS MODELS (40 exercises) 
+22:SKETCH ALL THEORY CHAPTERS +search about semaphores threads and barriers
+23:FREE time
+24:MAKE SURE ALL CHAPTERS ARE SKETCHED
+25:SOLVE ALL SEMINARS 
+26:SOLVE HALF OF THE LABS
+27:FINISH SOLVING THE LABS
+28:SKETCH THE CHEAT SHEET with AWK GREP SED threads semaphores etc 
+29:SOLVE NEW EXAM MODELS 
+30:SOLVE NEW EXAM MODELS 
+1:SKETCH THE CHEATSHEET 
+2:FINISH THE CHEATSHEET 
+3:Transcibe the virtual cheatsheet on our actual paper(AS U STUDY, You SHOULD MAKE A VIRTUAL paper that u will organize before the exam
+4:Read the virtual course materials before the exam
