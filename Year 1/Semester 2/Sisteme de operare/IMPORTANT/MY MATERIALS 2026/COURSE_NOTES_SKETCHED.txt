@@ -1,0 +1,685 @@
+THE ULTIMATE, CRYSTAL-CLEAR GUIDE
+                                                TO
+                                   OPERATING SYSTEMS & UNIX UTILITIES
+                                 (With Integrated Practice Exercises)
+
+=========================================================================================================
+CHAPTER 1: SETUP & CONNECTING TO LINUX
+=========================================================================================================
+
+1.1 The Ultimate Rule: Use the Command Line Only!
+-------------------------------------------------
+When learning Operating Systems, you might be tempted to use your mouse to click on folders, open text
+editors like Notepad or VS Code, or click visual buttons. Don't do it! 
+
+The practical tests and final exams for this course are conducted strictly inside a text-only terminal
+console[cite: 39, 40]. If you don't build muscle memory for navigating via the keyboard now, you will
+run out of time during exams[cite: 40].
+
+1.2 Setting Up Your Environment Based on Your Laptop
+----------------------------------------------------
+Depending on what kind of computer you own, your setup steps look a bit different:
+
+* If you already have a Linux OS installed: You are in great shape! Just open your native terminal
+  application[cite: 39]. However, you must make sure you have the essential tool suite installed.
+  Open your terminal and install them using your package manager (like "sudo dnf install" or "sudo apt
+  install" depending on your distro):
+  - gcc (The C Compiler) [cite: 41]
+  - gdb (The GNU Debugger) [cite: 41]
+  - valgrind (The ultimate tool to find memory leaks) [cite: 41]
+  - emacs / vim / nano (Command-line text editors) [cite: 41, 248]
+  - zip and unzip (For compressing/extracting files) [cite: 41]
+  - man-pages (The built-in documentation system) [cite: 41]
+
+* If you have a macOS computer: Your Mac's core operating system is Unix-based! This means you can open the
+  built-in Terminal application and it will feel almost identical to Linux[cite: 42, 111]. You should
+  install the same core development tools listed above using a package manager like Homebrew[cite: 42]. If you Wait
+  want an environment identical to the university's evaluation servers, consider installing Lima VM
+  (https://lima-vm.io) [cite: 43].
+
+* If you have a Windows computer: You have a few safe choices. Installing Linux directly alongside
+  Windows (dual-booting) is not recommended for absolute beginners because a small mistake can wipe
+  out your personal files[cite: 45]. Instead, choose one of these two safe approaches:
+  1. WSL 2 (Windows Subsystem for Linux): Go to the Microsoft Store and search for Alma Linux OS 9.
+     Download and install it[cite: 46]. It gives you a fully functional Linux terminal running inside Windows.
+  2. Virtualization: Install a hypervisor app like VirtualBox or VMware Workstation Player[cite: 48].
+     This program tricks an operating system into thinking it is running on real computer hardware, allowing
+     you to run Linux in a window inside Windows[cite: 48, 55]. Precise university setup steps can be found
+     online at http://www.cs.ubbcluj.ro/~rares/course/os/res/env-setup/windows/index.html[cite: 50].
+
+* The Cloud Option: You can sign up for an AWS Free Tier account and spin up a tiny, free EC2 virtual
+  machine running Linux[cite: 51]. You can then connect to it remotely via the internet from any computer.
+
+1.3 Connecting to the School Server via SSH
+-------------------------------------------
+Even if your laptop runs Linux perfectly, your practical graded assignments, laboratory sessions, and
+exams happen on a centralized school server[cite: 66]. To talk to this remote computer, we use a secure network
+protocol called SSH (Secure Shell)[cite: 69].
+
+
+* Connecting from Windows: Download a lightweight, free utility called PuTTY[cite: 69].
+  1. Open PuTTY[cite: 74].
+  2. In the "Host Name (or IP address)" field, type the school server's address (e.g., 193.226.40.129)[cite: 71].
+  3. Ensure the connection type is set to SSH[cite: 69].
+  4. Click Open.
+  5. Note: The very first time you connect, a warning window will pop up saying "The server's host key is
+     not cached..."[cite: 67]. Don't panic! This is normal. Type or click "Yes" to save the key and continue[cite: 68].
+  6. Type your university username and password when prompted[cite: 77].
+
+* Connecting from Linux or macOS: You don't need any extra software like PuTTY! Simply open your native
+  terminal app and use the built-in ssh tool[cite: 70].
+  - Working from home (specify incoming external network port with -p):
+    ssh -p 1234 your_username@193.226.40.129 [cite: 71]
+  - Working from campus:
+    ssh your_username@172.30.0.9 [cite: 72]
+
+💡 Pro-Tip for Lab Success: When working on assignments, open TWO terminal windows (consoles) at the exact
+same time[cite: 78]. Use one window exclusively for looking at manuals (man) or editing your source files[cite: 78].
+Use the second window purely for compiling, running, and testing commands[cite: 78]. This keeps you from
+constantly opening and closing apps!
+
+
+=========================================================================================================
+CHAPTER 2: GETTING STARTED WITH THE COMMAND LINE
+=========================================================================================================
+
+2.1 Why Are We Doing This?
+--------------------------
+Why learn cryptic commands instead of clicking gorgeous, intuitive graphical user interfaces (GUIs)?
+1. Raw Power & Speed: In production environments (like massive cloud servers hosting millions of users),
+   there is no visual desktop screen[cite: 88]. The command line interface (CLI) is all you have[cite: 88].
+2. The Lego Principle: Linux contains hundreds of small, laser-focused command utilities[cite: 84]. Each utility
+   does exactly one job perfectly. By connecting them together like building blocks, you can create a single,
+   dense "one-liner" command that accomplishes tasks that would otherwise require writing hundreds of lines of
+   complex C code[cite: 84, 85, 89].
+
+2.2 Console Tricks, Shortcuts, and Deadlocks
+---------------------------------------------
+The command line environment is case-sensitive[cite: 112]. This means "mkdir" is a valid command, but "MkDir" or
+"MKDIR" will throw an error[cite: 112]. Similarly, a file named "code.c" is completely separate from "Code.C"[cite: 112].
+
+To speed up your workflow, memorize these crucial console behaviors and shortcuts:
+
+* The Clipboard Trick: To copy text in a Linux terminal, simply highlight it with your mouse cursor[cite: 119].
+  It is automatically copied to your clipboard[cite: 119]! To paste it, simply Right-Click (on Windows Putty) or
+  Middle-Click your scroll wheel (on native Linux)[cite: 120].
+
+* Critical Keyboard Shortcuts:
+  - Tab: Autocomplete[cite: 122]. Type the first few letters of a command or file name, hit Tab, and the system
+    fills in the rest[cite: 122]. Hit it twice to see all possibilities.
+  - Up / Down Arrows: Navigate through your history of previously typed commands so you don't have to
+    re-type long entries[cite: 123].
+  - Ctrl + C: Stop/Kill the program currently running[cite: 125]. Indispensable if your C program gets stuck
+    in an infinite loop[cite: 125]!
+  - Ctrl + S: The Panic Lock[cite: 126]. Students often press this trying to save their work, but in a terminal,
+    it completely freezes and locks the console screen interface[cite: 126]. It looks like your computer crashed.
+  - Ctrl + Q: The Unlock Key[cite: 128]. If you accidentally pressed Ctrl + S, press this to unfreeze your terminal
+    and safely reveal everything you frantically typed while it was locked[cite: 128, 129].
+  - Ctrl + Z: Suspend/Pause the program[cite: 131]. Do not use this to mean "undo"[cite: 131]! It pauses a process in the 
+    background, which can clog up system resources. Always prefer Ctrl + C unless you explicitly want to background a job.
+  - Ctrl + A and Ctrl + E: Jump instantly to the Beginning (A) [cite: 133] or End (E) [cite: 135] of your current text line.
+  - Ctrl + D: Sends an End-of-File (EOF) signal when providing input[cite: 140]. If pressed on a blank command line, it
+    closes your remote server connection cleanly (identical to typing exit)[cite: 141].
+
+2.3 Understanding Commands, Arguments, and Paths
+-------------------------------------------------
+A command is simply an executable program[cite: 155]. The basic construction of a terminal input is:
+Command   [Optional Options/Flags]   [Target Arguments] [cite: 157]
+
+Spaces act as the explicit separator between components[cite: 157, 182]. Let's dissect how arguments and flags control
+behavior using the directory-listing command "ls":
+* ls: Lists the file/folder names inside your current working directory[cite: 158].
+* ls -l: Uses a short-form option flag (-l stands for Long listing)[cite: 161, 189]. It shows extensive details:
+  file permissions, file size, owner name, and modification timestamp.
+* ls -l -a (or combined as ls -la): The -a flag tells the program to include All files, including hidden
+  files (files whose names start with a dot ".", like .bashrc)[cite: 162, 190].
+* ls -l --color=never /etc: Here we pass a long-form option flag (--color=never) [cite: 166, 192] and an explicit target
+  path argument (/etc)[cite: 169]. This lists contents inside the system configurations folder without coloring text.
+
+* The Concept of a Single Root Path: Unlike Windows, which breaks your computer storage up into distinct drive
+  letters (C:, D:), UNIX-based systems use a Single Unified File System Tree[cite: 172]. Everything starts at the absolute
+  root folder, which is designated by a single forward slash "/"[cite: 173]. All hard drives and network folders are
+  mounted as directories branching out from that single root "/"[cite: 173].
+
+
+  - The path separator is always a forward slash "/" (not the Windows backslash "\")[cite: 175].
+  - pwd (Print Working Directory): Run this command anytime you get lost to print your current exact path
+    from the absolute root folder[cite: 177].
+
+2.4 Mastering the System Manuals (man)
+--------------------------------------
+You do not need to memorize every single flag for every command. Linux stores an entire encyclopedia of documentation
+natively via the "man" command[cite: 196]. To look up documentation for the file listing tool, type:
+man ls [cite: 197]
+
+To read documentation on a programming function inside C, type its name:
+man pthread_create [cite: 197, 198]
+
+When a manual page opens, it uses a window utility called a pager[cite: 199]. To control the pager view:
+* Spacebar: Scroll down one full page[cite: 200].
+* b: Scroll up one full page[cite: 201].
+* /: Search for a word. Type /, type the keyword you want to find, and hit enter[cite: 203].
+* q: Quit the manual and return safely back to the command prompt[cite: 204].
+
+Manual Sections Matter! The manual is divided into numbered sections because some names overlap[cite: 220].
+* man open (or man 1 open): Section 1 displays standard user commands executable from the shell[cite: 221].
+* man 2 open: Section 2 displays programmatic low-level System Calls handled by the Linux Kernel[cite: 222].
+
+2.5 The Power of Pipelines (|)
+------------------------------
+A pipeline operator is represented by the vertical bar symbol "|". It takes the standard text output generated
+by the command on its left and passes it directly as the text input to the command on its right[cite: 237].
+
+Suppose you have a raw file named "a.txt" containing un-sorted entries, and you want to look at only the first 5 
+lines in perfect alphabetical order[cite: 238]. You chain them together:
+sort a.txt | head -n 5 [cite: 240]
+1. "sort" alphabetizes the file text line-by-line[cite: 239].
+2. Instead of printing that huge list to your screen, the "|" pipes it to "head"[cite: 237, 239].
+3. "head -n 5" crops the stream, outputting only the top 5 rows onto your monitor view[cite: 239, 240].
+
+2.6 Command-Line Text Editors (Configuring Vim)
+-----------------------------------------------
+Since you are not allowed to use graphic windows during exams, you must learn a terminal text editor like Vim,
+Emacs, or Nano[cite: 248, 249]. Vim is installed by default on almost every server worldwide[cite: 274].
+
+To make your code readable inside Vim, you should configure custom settings like syntax highlighting and proper
+indent spacing[cite: 279]. In Linux, configuration files located inside your user home directory (abbreviated by the
+tilde symbol "~") start with a dot, making them hidden[cite: 279, 283, 285].
+
+Let's create or edit your Vim configuration file:
+vim ~/.vimrc [cite: 279]
+
+Type or insert the following lines exactly as shown:
+syntax on [cite: 280]
+set tabstop=4 [cite: 281]
+set expandtab [cite: 282]
+* syntax on: Activates vibrant color highlights matching your programming language code patterns[cite: 279, 280].
+* set tabstop=4: Defines a standard width of 4 spaces whenever you press your Tab key[cite: 279, 281].
+* set expandtab: Instructs the editor to safely transform Tab character key presses into explicit physical
+  spaces to prevent formatting corruption across different machines[cite: 279, 282].
+
+2.7 C Programming in the Command Line Interface
+-----------------------------------------------
+When writing C programs inside a terminal environment, you don't click a big visual button labeled "Run"[cite: 106].
+You control the compiler manually[cite: 290].
+
+* Standard Main Function Declaration: A production-grade, standard C file should expose its parameters
+  explicitly to listen for user arguments passed from the shell execution command line[cite: 303, 343]:
+  
+  #include <stdio.h>
+  int main(int argc, char** argv) { [cite: 303]
+      // Code goes here
+      return 0; [cite: 341]
+  }
+
+  - argc (Argument Count): An integer holding the absolute total number of text items typed on the
+    execution line[cite: 306].
+  - argv (Argument Vector): An array of text strings holding the individual typed items[cite: 303].
+    * argv[0] always holds the name of your executable program itself[cite: 304].
+    * argv[1] holds the very first user parameter passed after the program name[cite: 305].
+
+* Safe Compiling via GCC Flags: To compile your C file, do not just type "gcc file.c". Force the compiler to
+  catch bugs early by enabling strict safety warning flags[cite: 350]:
+  gcc -Wall -Wextra -Werror -o my_program file.c [cite: 350]
+  - -Wall: Activates all standard development warnings about questionable code structures[cite: 350].
+  - -Wextra: Activates extra specialized warning parameters not covered by -Wall[cite: 350].
+  - -Werror: Extremely Strict. Treats every warning as a fatal compilation error, blocking the output build until
+    you fix the source code root problem[cite: 350].
+  - -o my_program: Designates the explicit output file name of the resulting compiled machine binary[cite: 350].
+
+  To run the resulting compiled program file from your current folder, execute:
+  ./my_program [cite: 353]
+
+* Memory Leak Defense with Valgrind: In C, whenever you allocate dynamic blocks of heap memory using malloc(),
+  you must explicitly clear them out manually using free() once your program finishes processing them[cite: 308, 309].
+  Failing to release heap structures leads to memory leaks.
+
+  To audit your program's pointer allocation health, run it wrapped inside the Valgrind analyzer[cite: 296, 328]:
+  valgrind ./my_program
+  If your code contains unfreed pointers or writes past array boundary tracks, Valgrind will print a detailed memory
+  traceback summary pinpointing exactly where the leakage or code safety failure occurred[cite: 329, 330].
+
+
+=========================================================================================================
+CHAPTER 3: REGEX & COMMAND LINE UTILITIES (GREP, SED, AWK)
+=========================================================================================================
+
+3.1 Regular Expressions (POSIX ERE)
+-----------------------------------
+A Regular Expression (Regex) is a compact language used to match text patterns[cite: 450, 458]. Think of it as an
+advanced search filter. We use POSIX Extended Regular Expression syntax[cite: 449].
+
+| Regex Token | Literal Matching Meaning [cite: 462, 2274]                                                  |
+| :---        | :---                                                                                       |
+| .           | Matches any single character whatsoever except a newline[cite: 462, 2274].                  |
+| ^           | Forces the matching pattern to start at the beginning of a line[cite: 462, 2274].           |
+| $           | Forces the matching pattern to end at the end of a line[cite: 462, 2274].                   |
+| \<          | Explicitly targets the beginning of a word boundary[cite: 462, 2274].                      |
+| \>          | Explicitly targets the end of a word boundary[cite: 462, 2274].                            |
+| [abc]       | Matches one single character that is explicitly either a, b, or c[cite: 462, 2274].        |
+| [a-z]       | Matches one single character anywhere in the range of lowercase letters[cite: 462, 2274].   |
+| [^0-9]      | Matches one single character that is NOT a number digit[cite: 462, 2274].                 |
+| * | Matches the preceding expression token zero or more times sequentially[cite: 462, 2274].   |
+| +           | Matches the preceding expression token one or more times sequentially[cite: 462, 2274].    |
+| ?           | Matches the preceding expression token zero or one time (makes it optional)[cite: 462, 2274].|
+| {m,n}       | Matches the preceding token at least m times and at most n times[cite: 462, 2274].          |
+| ( )         | Groups multiple tokens together into a single composite sub-expression block[cite: 462, 2274].|
+| \|          | Logical OR operator; matches either the pattern on the left or right[cite: 462, 2274].     |
+
+3.2 Finding Text with grep
+--------------------------
+grep is a tool that scans files or text streams and prints lines that match a regex pattern[cite: 479].
+
+* Essential Option Flags:
+  - -E: Mandatory. Instructs the tool to interpret the search token pattern using Extended Regular Expression
+    rules[cite: 487].
+  - -v: Inverts the filter behavior, printing only lines that do NOT match the designated pattern[cite: 489].
+  - -i: Ignores case differences, matching capital and lowercase letters identically[cite: 491].
+  - -c: Counts and displays only the absolute number of matching lines instead of printing the lines themselves[cite: 2348].
+  - -q: Quiet mode. Prints nothing to the screen[cite: 493]. It simply exits with code 0 if a match is found or 1
+    if it isn't[cite: 493]. This is very useful inside script conditionals[cite: 494].
+
+* Practical Case Study: Processing /etc/passwd
+  The system file /etc/passwd contains user account records[cite: 495]. Lines are structured using a colon ":" as a
+  field separator character[cite: 497]:
+  username : password : user_id : group_id : user_info/full_name : home_directory : default_shell [cite: 498]
+
+  Let's look at some real filtering command examples from university exercises:
+  1. Find records containing the precise isolated username "dan":
+     grep -E "^dan:" /etc/passwd [cite: 507]
+     (The "^" flag coupled with the trailing ":" ensures it only matches line records where the username field is
+     exactly "dan" [cite: 505], skipping lines where "dan" appears elsewhere [cite: 506]).
+  2. Find accounts whose shell is NOT bash:
+     grep -E -v "/bash$" /etc/passwd [cite: 520]
+     (The "$" character pins the matching window to the very end of the line, checking the default shell field path [cite: 519]).
+  3. Display the number of lines in a file using ONLY grep:
+     grep -E -c ".*" input.txt [cite: 2348]
+
+3.3 Stream Editing with sed
+---------------------------
+sed is a stream editor used to transform or delete text lines based on regular expression rules[cite: 553]. By default,
+it prints the transformed output to your screen without modifying the original input file[cite: 554].
+
+* The Substitution Command Structure:
+  The primary command structure used for search-and-replace tasks follows this syntax pattern:
+  sed -E "s/regex_pattern/replacement_text/flags" input_file.txt [cite: 557]
+  - s: Stands explicitly for the Substitution command[cite: 558].
+  - /: Acts as the structural tracking delimiter[cite: 559]. You can substitute it with other characters (like
+    commas: sed -E "s,/[^/]*$,,") if you need to process paths containing forward slashes[cite: 559, 703].
+  - g (Global Flag): Forces the tool to replace every single match found on a line[cite: 562]. Without it, only the
+    very first appearance on each line is changed[cite: 562].
+
+* Group Capturing Reference Tricks:
+  You can capture matched patterns inside parentheses "()" and reuse them inside your replacement text string
+  via ordered group back-references like "\1", "\2", etc[cite: 565].
+  - Duplicate each occurrence of an integer number:
+    sed -E "s/([0-9]+)/\1\1/g" input.txt [cite: 2289]
+    (The pattern captures a consecutive block of digits in group 1, and the replacement text "\1\1" writes it back
+    twice consecutively [cite: 2289]).
+
+* The Transliteration Command (y/):
+  The "y" command maps individual characters from a source set to a destination set based strictly on their positions.
+  The two character lists must be of identical length[cite: 572].
+  - Swap all digits in user accounts by shifting them up (and mapping 9 to 0):
+    cut -d: -f1 /etc/passwd | sed "y/0123456789/1234567890/" [cite: 2356]
+
+* Deleting Entire Lines:
+  To filter out and delete matching lines completely from your output stream, use the line-deletion flag "d"
+  at the tail end of your pattern command bracket[cite: 574]:
+  sed -E "/[0-9]{5,}/d" input.txt [cite: 586]
+  (This drops any text line record containing a consecutive block of 5 or more numerical digits [cite: 585, 586]).
+
+3.4 Data Parsing with awk
+-------------------------
+If a file structure resembles a spreadsheet table divided into column records separated by a standard delimiter
+character (like spaces, tabs, or colons), use awk[cite: 600]. awk reads text line-by-line, breaks each line up into
+individual field tokens, and runs program script commands on those fields[cite: 600, 601].
+
+* Built-in Field Variables:
+  - $0: Represents the entire raw line string[cite: 613].
+  - $1: Holds the text string content of the very first data column field[cite: 614].
+  - $2: Holds the text string content of the second data column field, and so forth[cite: 614].
+  - NF: A built-in tracking variable holding the total Number of Fields on the current line[cite: 611]. Useful for target
+    tracking (e.g., $NF always extracts the final column field [cite: 629, 2320]).
+  - NR: Holds the current index number of the text line being parsed (Number of Records)[cite: 610].
+
+* The Action-Block Syntax Structure:
+  An awk script consists of structured instructions formatted as:
+  Optional_Selector_Pattern_Conditional   { Action_Executable_Block } [cite: 602, 603]
+  If you drop the selector conditional pattern, the action execution block automatically runs on every single line
+  of input text[cite: 604, 605].
+
+  - Print only the first 4 fields from each even-numbered line from a file:
+    awk 'NR % 2 == 0 {print $1" "$2" "$3" "$4}' input_file [cite: 2275, 2277]
+    (The selector condition "NR % 2 == 0" isolates even lines[cite: 2277]. If a line has fewer than 4 fields, it simply prints what
+    is available without crashing [cite: 2276]).
+
+  - Print line number and the exact middle field of lines that contain an ODD number of fields:
+    awk 'NF % 2 == 1 { i = int((NF + 1) / 2); print NR " " $i }' input_file [cite: 2299, 2302]
+    (Because division in awk defaults to floating-point values, we wrap the calculation inside the explicit int() function
+    to truncate decimals [cite: 2300, 2301]).
+
+* The Special BEGIN and END Blocks:
+  - BEGIN { ... }: Runs its code block once before any text line data is parsed from the target file[cite: 607].
+  - END { ... }: Runs its code block once after every text line inside the file has been parsed[cite: 608].
+
+  Let's calculate the sum of all PIDs that use the text editor vim, joe, emacs, nano, or pico:
+  ps -ef | grep -E "^([^ ]+[ ]+){7}(vim|joe|nano|pico|emacs)" | awk 'BEGIN {sum=0} {sum+=$2} END {print "Sum: " sum}' [cite: 2338, 2340]
+
+
+=========================================================================================================
+CHAPTER 4: UNIX SHELL PROGRAMMING (BASH)
+=========================================================================================================
+
+4.1 Standard I/O Streams and Redirections
+-----------------------------------------
+Whenever a program runs inside Linux, the operating system tracks its file interactions using integer identifiers
+called File Descriptors[cite: 749, 750]. By default, every newly spawned process automatically inherits three core file
+communication streams[cite: 751]:
+
+
+1. Standard Input (stdin) -> File Descriptor 0: Where the process reads its incoming instructions[cite: 745]. Natively
+   wired to listen to keystrokes from your physical keyboard layout[cite: 751].
+2. Standard Output (stdout) -> File Descriptor 1: Where the program prints its valid data results[cite: 746]. Natively
+   wired to print text onto your monitor screen[cite: 751].
+3. Standard Error (stderr) -> File Descriptor 2: A separate stream where the program prints diagnostics or error
+   notices[cite: 747]. Keeping error messages separate from normal output data prevents diagnostics from corrupting
+   your data pipeline streams[cite: 747].
+
+* Redirection Operator Syntax:
+  You can redirect these streams away from your keyboard and screen to interact with physical files on your disk[cite: 755]:
+  - > (Overwrite Output): Redirects the standard output (stdout) stream of a command into a file[cite: 757]. If the target
+    file already exists, it is completely wiped out and overwritten from scratch.
+    ls -l /etc > system_list.txt [cite: 758]
+  - >> (Append Output): Redirects standard output stream data to the tail end of a file, appending new data without
+    destroying existing content[cite: 759, 762].
+  - < (Redirect Input): Forces a program to read its input stream data from a file instead of waiting for keyboard
+    input[cite: 765, 767].
+    ./my_program < input_data.txt
+  - 2> (Redirect Errors): Specifically intercepts the standard error stream (File Descriptor 2) and redirects it to a
+    separate log file[cite: 768, 769].
+    find /etc -name "*.sh" 2> errors.log [cite: 702]
+  - 2>&1 (Merge Streams): Merges the error output stream directly into the standard output stream[cite: 773]. This pattern is
+    often used to discard all program output completely by sending it to a special virtual trash file called /dev/null[cite: 775]:
+    rm old_file.c > /dev/null 2>&1 [cite: 773]
+    (Anything written into the virtual black hole device /dev/null instantly disappears from system tracking storage [cite: 774]).
+
+4.2 The Inverse Logic of Command Truth Values
+----------------------------------------------
+In C programming, an exit code or conditional evaluation value of 0 means False, and any non-zero value represents True.
+
+In Linux Shell Scripts, this rule is inverted!
+* An exit code value of 0 means TRUE (The command finished its task successfully with zero errors)[cite: 829].
+* Any exit code value other than 0 (like 1, 127, etc.) means FALSE (The command failed, was aborted, or could not complete
+  its task)[cite: 829, 830].
+
+* Short-Circuit Evaluation Operators:
+  You can chain multiple terminal commands sequentially using short-circuit logic loops[cite: 835]:
+  - && (Logical AND): The command on the right runs only if the command on the left evaluates as TRUE (exit code 0)[cite: 835].
+    gcc code.c -o app && ./app [cite: 350, 835]
+    (The binary program ./app runs only if the code compiles successfully with zero errors).
+  - || (Logical OR): The command on the right runs only if the command on the left evaluates as FALSE (fails with a
+    non-zero exit code)[cite: 835].
+    test -f backup.tar || echo "Critical Warning: Backup file not found!" [cite: 835, 843]
+
+4.3 Shell Variables and Embedded Evaluation Commands
+----------------------------------------------------
+When defining variables inside a Bash script, you must not include spaces around the assignment equals sign "="[cite: 858]!
+
+# Correct Definition
+USER_NAME="Maria" [cite: 858]
+AGE=21 [cite: 858]
+
+# INCORRECT (Will throw a syntax execution fault)
+USER_NAME = "Maria"
+
+* To read or substitute the value of a variable later in your script, prefix its identifier name with a dollar sign
+  token: $USER_NAME[cite: 865].
+* Use curly braces around variable names if you need to append characters immediately to the end of the variable's value
+  without confusion: ${USER_NAME}cat[cite: 865, 869].
+
+* String Quoting Rules:
+  - Double Quotes ("...") allow substitutions: Variables and embedded evaluations prefixed with a "$" inside double quotes
+    are parsed and replaced by their values[cite: 870].
+  - Single Quotes ('...') block substitutions: Everything inside single quotes is treated as literal, raw text characters.
+    No variable parsing or substitution occurs[cite: 870].
+
+* Embedded Commands:
+  If you enclose a terminal command inside backticks ( `command` ), the shell runs that command and substitutes its standard text
+  output directly in place[cite: 856, 861, 862]. For example:
+  TOTAL_STUDENTS=`grep "/gr211/" /etc/passwd | wc -l` [cite: 864]
+  echo "There are $TOTAL_STUDENTS registered students."
+
+4.4 Writing and Provisioning Shell Scripts
+------------------------------------------
+A shell script is simply a text file containing a sequence of commands interpretable by the shell interpreter engine[cite: 880].
+
+* Step 1: Write the Script File
+  Create a file named "hello.sh". The very first line of a script should always feature a special sequence called a Shebang
+  (#!/bin/bash) [cite: 901, 904]. This tells the operating system which interpreter program to use to run the commands inside
+  the file[cite: 880].
+  
+  #!/bin/bash [cite: 904]
+  # This is a comment line record block [cite: 880]
+  echo "Hello World, today is $(date)" [cite: 905]
+
+* Step 2: Provision File Execution Permissions
+  When you create a file, it does not have execution permissions by default. If you try to run ./hello.sh, the system will throw
+  a "Permission Denied" error. To inspect permissions, look at the directory long listing format output[cite: 889]:
+  ls -l hello.sh [cite: 889]
+  The first 10 characters display file layout properties:
+  - The 1st character defines file classification types (- means standard file, d means directory)[cite: 890].
+  - Characters 2–4 represent Owner User permissions[cite: 891].
+  - Characters 5–7 represent Group permissions[cite: 892].
+  - Characters 8–10 represent World/Everybody Else permissions[cite: 893].
+
+  Each triplet maps permission flags using a binary positional value[cite: 894, 895]:
+  - r (Read) = value 4 [cite: 896]
+  - w (Write) = value 2 [cite: 897]
+  - x (Execute) = value 1 [cite: 896]
+
+  To grant the file owner full permissions (4+2+1 = 7) while revoking all permissions from the group and world (0), use the chmod command[cite: 899, 900]:
+  chmod 700 hello.sh [cite: 900]
+  Now you can safely run your script: ./hello.sh [cite: 908]
+
+* Script-Internal Special Positional Variables:
+  Inside a script, you can access parameters passed by the user on the execution line using special variables[cite: 909, 913]:
+  - $0: Holds the exact file path name of the script command itself[cite: 911].
+  - $1 to $9: Holds the first through ninth positional parameters passed to the script[cite: 913].
+  - $#: Returns the total count number of arguments passed into the script[cite: 916].
+  - $@: Expands to display all positional arguments together as a space-separated list[cite: 915].
+  - $?: Returns the Exit Code of the previous command. Crucial for checking if a command succeeded (0) or failed[cite: 918].
+
+4.5 The for Loop Structure
+--------------------------
+The for loop functions like a foreach construct, iterating a loop index variable across a list of space-separated text items[cite: 950, 951].
+
+* Basic Loop Syntax:
+  #!/bin/bash [cite: 955]
+  for ITEM in alpha bravo charlie delta; do [cite: 956]
+      echo "Processing element: $ITEM" [cite: 956]
+  done [cite: 957]
+  (Note that the command separator semicolon ";" is mandatory before the "do" keyword if written on the same line [cite: 953, 956]).
+
+* Processing Input Arguments:
+  To iterate through all arguments passed to your script by a user, use the special variable token list $@[cite: 964, 966]:
+  #!/bin/bash [cite: 965]
+  for ARG in "$@"; do [cite: 966]
+      echo "User parameter passed: $ARG" [cite: 968]
+  done [cite: 967]
+
+4.6 The if/elif/else Conditional Structure
+------------------------------------------
+To evaluate conditional evaluations inside an if block statement, we use the test utility command[cite: 1015, 1020].
+
+* Classic test Option Arguments:
+  - String Comparisons:
+    * test -z "$VAR": Evaluates as True if the target string length is completely Zero/Empty[cite: 848, 850].
+    * test -n "$VAR": Evaluates as True if the target string is Not Empty[cite: 850].
+    * test "$S1" == "$S2": Evaluates as True if both string contents are identical[cite: 846, 850].
+  - Integer Numerical Comparisons[cite: 851]:
+    * -eq (Equal) | -ne (Not Equal) [cite: 845, 851]
+    * -lt (Less Than) | -le (Less or Equal) [cite: 851]
+    * -gt (Greater Than) | -ge (Greater or Equal) [cite: 851]
+  - File System Inquiries[cite: 853]:
+    * test -f path: Checks if a path exists and is a regular file[cite: 843, 853].
+    * test -d path: Checks if a path exists and is a directory folder[cite: 853, 1023].
+    * test -r path: Checks if a target file exposes read permissions[cite: 1014].
+
+* The Square Bracket Syntactic Alias:
+  To make conditional statements look cleaner, you can replace the word "test" with a single square bracket "["[cite: 1037].
+  The open bracket "[" is a physical command name alias, not just syntax grouping[cite: 1037]. Therefore, you must leave spaces around the brackets[cite: 1038]!
+
+  # Correct Formatting Structure
+  if [ $AGE -ge 21 ]; then [cite: 1037, 1042]
+      echo "Access Authorized."
+  fi [cite: 1051]
+
+  Let's look at a comprehensive if/elif/else example script from the slides that prints classification based on path arguments:
+  #!/bin/bash [cite: 1018]
+  for TARGET in "$@"; do [cite: 1019]
+      if [ -f "$TARGET" ]; then [cite: 1042, 1044]
+          echo "$TARGET is a regular data file."
+      elif [ -d "$TARGET" ]; then [cite: 1043, 1046]
+          echo "$TARGET is a directory folder."
+      else [cite: 1050]
+          echo "Warning: Unknown file classification path." [cite: 1053]
+      fi [cite: 1051]
+  done [cite: 1048]
+
+4.7 The while Loop Structure
+----------------------------
+The while loop continuously executes its code block as long as its target loop condition evaluates as True (exit code status 0)[cite: 1055, 1059].
+
+* Example: Read Input Until Stopped
+  This script prompts a user for text input and loops until they type the word "stop"[cite: 1056, 1057]:
+  #!/bin/bash [cite: 1058]
+  while true; do [cite: 1059]
+      read X [cite: 1060]
+      if [ "$X" == "stop" ]; then [cite: 1061, 1062]
+          break [cite: 1063]
+      fi [cite: 1064]
+  done [cite: 1065]
+
+* Example: Processing Streams Line-by-Line
+  You can combine a while loop with the read command to process text streams line-by-line[cite: 1070, 1075]. This script reads file paths
+  from a find command pipeline, checks their file sizes using awk, and prints files that cross a target size threshold[cite: 1069, 1070]:
+  
+  #!/bin/bash [cite: 1071]
+  DIRECTORY=$1 [cite: 1072]
+  SIZE_THRESHOLD=$2 [cite: 1073]
+  
+  find "$DIRECTORY" -type f | while read FILE_PATH; do [cite: 1074, 1075]
+      # Extract file size column using a long listing command piped to awk
+      FILE_SIZE=`ls -l "$FILE_PATH" | awk '{ print $5 }'` [cite: 1076]
+      
+      if [ $FILE_SIZE -gt $SIZE_THRESHOLD ]; then [cite: 1076]
+          echo "Large file detected: $FILE_PATH" [cite: 1077]
+      fi [cite: 1078]
+  done [cite: 1079]
+
+
+=========================================================================================================
+CHAPTER 5: MASTERING LAB EXERCISE COMPILATIONS & HIDDEN PATTERNS
+=========================================================================================================
+
+The following code paradigms and problems are extracted directly from the official laboratory testing archives, 
+providing concrete practical implementations of text processing techniques.
+
+5.1 Processing Processes and User Counts (Problem 10 / Archive Sync)
+---------------------------------------------------------------------
+Task: Print the total number of active processes run by each distinct user in the system, sorted by density[cite: 2314].
+Command Pipeline:
+ps -ef | grep -E -v "^UID" | awk '{print $1}' | sort | uniq -c [cite: 2317]
+
+* Step-by-Step Breakdown:
+  1. ps -ef : Gathers low-level system tracking tables for all processes currently in memory[cite: 2315, 2339].
+  2. grep -E -v "^UID" : Drops the column description header line from the stream[cite: 2317].
+  3. awk '{print $1}' : Strips away everything except the very first column field, which contains the owner's username[cite: 614, 2317].
+  4. sort : Groups identical names together into continuous lines so uniq can process them safely[cite: 2317].
+  5. uniq -c : Compresses duplicate names, prefixing each entry with its total appearance frequency count[cite: 2317].
+
+5.2 Inverting Permissions Parsing via Sed Groups (Problem 11 / Archive Sync)
+-----------------------------------------------------------------------------
+Task: For each standard file in the directory, isolate and print strictly its file name and user/owner base read-write-execute permission triplet[cite: 2318, 2319].
+Command Pipeline:
+ls -l | grep -E "^-" | awk '{print $1" "$NF}' | sed -E "s/^. (...).{7}/\1/" [cite: 2320]
+
+* Step-by-Step Breakdown:
+  1. grep -E "^-" : Restricts the incoming long listing text lines strictly to regular data files, filtering out directories[cite: 890, 2320].
+  2. awk '{print $1" "$NF}' : Extracts column 1 (the full permission string, e.g., -rwxr-xr-x) and column $NF (the file name)[cite: 614, 629, 2320].
+  3. sed -E "s/^. (...).{7}/\1/" : Matches the leading file type character (`^.`), captures the next three characters corresponding to owner permissions
+     (`(...)`), skips the group/world permission trailing characters (`.{7}`), and replaces the string with group 1 back-reference contents (`\1`)[cite: 565, 891, 892, 893, 2320].
+
+5.3 Character-Class Space Escapes (Problem 5 / Archive Sync)
+-------------------------------------------------------------
+Task: Trim all data trailing text characters positioned after the final structural whitespace delimiter on a line[cite: 2290].
+Command Pattern:
+sed -E "s/(\s)[^[:space:]]*$/\1/" input_file [cite: 2295]
+
+* Crucial Lab Commentary:
+  If you try to create a "match any character except" group using a backslash inside standard brackets like `[^\s]`, it will fail[cite: 2296].
+  The terminal interprets `[^\s]` literally as "any character except a literal backslash or an 's'"[cite: 2296]. To properly negate space classes inside brackets,
+  you must use the explicit POSIX character class format: `[^[:space:]]`[cite: 2297].
+
+5.4 Bound Interval Target Searching (Problem 8 & 21 / Archive Sync)
+-------------------------------------------------------------------
+Task: Find text lines containing a maximum of 5 vowels situated between two explicit caret `^` symbols[cite: 2305].
+Command Pattern:
+grep -E "\^([^aeiouAEIOU]*[aeiouAEIOU][^aeiouAEIOU]*){0,5}\^" input_file [cite: 2309]
+
+* Crucial Lab Commentary:
+  Because carets have an active literal structural meaning in regex (pinning matches to line starts), you must safely escape them using a backslash: `\^`[cite: 459, 462].
+  The pattern matches a caret, followed by up to 5 repetitions of a vowel wrapped in non-vowel buffers, terminated by a closing caret[cite: 2309].
+  When using bounded intervals like `{,4}` inside an awk file, remember to compile using the strict `--posix` flag to enable proper interval parsing[cite: 2371, 2372].
+
+
+=========================================================================================================
+CHAPTER 6: C PROGLAB PRACTICALS: MEMORY TRACKING & BINARY I/O
+=========================================================================================================
+
+This section outlines the laboratory procedures for locating memory problems and implementing stable binary file transformations on data matrices.
+
+6.1 Lab Deployment Setup
+-------------------------
+To fetch and prepare the standard university practice structures, execute the following workflow in your terminal:
+wget http://www.cs.ubbcluj.ro/~rares/course/os/res/practice/c-test/c-test-practice.zip
+unzip c-test-practice.zip
+cd c-test-practice
+
+6.2 Matrix Storage Transformations: Text to Memory to Binary
+------------------------------------------------------------
+When reading an integer matrix from a formatted text file, the dimensions are typically stored on the first line, followed by the row values:
+7 3 (7 rows, 3 columns) [cite: 359, 362]
+1 2 3 [cite: 363]
+4 5 6 [cite: 364]
+...
+
+To handle this matrix in memory without memory leaks or boundary compilation alerts, allocate rows dynamically using a double pointer (`int** m`):
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(int argc, char** argv) {
+    FILE* f = fopen(argv[1], "r"); [cite: 380, 381]
+    int rows, cols;
+    fscanf(f, "%d %d", &rows, &cols); [cite: 383, 384]
+
+    // Allocate the primary array of row pointer references
+    int** m = (int**)malloc(rows * sizeof(int*)); [cite: 378, 385]
+    for (int i = 0; i < rows; i++) { [cite: 386]
+        m[i] = (int*)malloc(cols * sizeof(int)); [cite: 387]
+        for (int j = 0; j < cols; j++) {
+            fscanf(f, "%d", &m[i][j]); [cite: 389]
+        }
+    }
+    fclose(f); [cite: 390]
+
+    // Complete cleanup to satisfy Valgrind diagnostics
+    for (int i = 0; i < rows; i++) { [cite: 393, 399]
+        free(m[i]); [cite: 399]
+    }
+    free(m); [cite: 400]
+    return 0;
+}
