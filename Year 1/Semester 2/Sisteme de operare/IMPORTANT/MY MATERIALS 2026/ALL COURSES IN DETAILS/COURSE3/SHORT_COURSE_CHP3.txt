@@ -1,0 +1,91 @@
+======================================================================
+                     AWK & REGEX EXAM CHEAT SHEET
+======================================================================
+
+1. AWK CORE INTERNAL VARIABLES
+----------------------------------------------------------------------
+NR : Number of Record -> The current line number (starts at 1).
+NF : Number of Fields -> Total number of words/columns on current line.
+$0 : The entire current line.
+$1, $2, ... : The 1st field, 2nd field, etc.
+$NF : The exact last field on the line.
+$(NF-1) : The exact next-to-last (penultimate) field.
+
+*Note on $ variable indexing: You can use fields dynamically.
+ If a variable `pos = 3`, then `$pos` means `$3`.
+
+======================================================================
+2. PRACTICAL AWK SCRIPTS (EXPANDED & READABLE)
+----------------------------------------------------------------------
+
+--- PROBLEM A: Print first 4 fields of even-numbered lines ---
+awk '{
+    if (NR % 2 == 0) {
+        limit = (NF < 4) ? NF : 4
+        for (i = 1; i <= limit; i++) {
+            printf "%s", $i
+            if (i < limit) printf " "
+        }
+        print ""
+    }
+}' input_file
+
+--- PROBLEM B: Odd fields -> Print line number & middle field ---
+awk '{
+    if (NF % 2 == 1) {
+        mid_pos = int((NF + 1) / 2)
+        mid_value = $mid_pos
+        print NR, mid_value
+    }
+}' input_file
+
+--- PROBLEM C: Math product of 2nd and next-to-last field ---
+awk '{
+    if (NF >= 3) {
+        product = $2 * $(NF - 1)
+        print product
+    }
+}' input_file
+
+--- PROBLEM D: Swap 2nd field with next-to-last field ---
+awk '{
+    if (NF >= 4) {
+        aux = $2
+        $2 = $(NF - 1)
+        $(NF - 1) = aux
+        print $0
+    }
+}' input_file
+
+--- PROBLEM E: Odd line length, starts & ends with vowel ---
+awk '{
+    line_len = length($0)
+    if (line_len % 2 == 1) {
+        if ($0 ~ /^[aeiouAEIOU]/) {
+            if ($0 ~ /[aeiouAEIOU]$/) {
+                print $0
+            }
+        }
+    }
+}' input_file
+
+======================================================================
+3. ESSENTIAL REGEX SYNTAX FOR EXAMS
+----------------------------------------------------------------------
+^               : Matches the START of a line.
+$               : Matches the END of a line.
+^...$           : Strict match of the whole line from start to end.
+[aeiouAEIOU]    : Matches any single vowel (case-insensitive).
+[a-zA-Z]        : Matches any single letter (used to define words).
+[^aeiou]        : Matches any character EXCEPT vowels (Negation).
++               : Quantifier - repeated 1 or more times.
+* : Quantifier - repeated 0 or more times.
+{n,}            : Quantifier - repeated at least `n` times.
+( )             : Groups patterns together and saves them in memory.
+\1, \2, \3      : Backreferences used in SED to reuse saved groups.
+
+--- CRITICAL REGEX SHABLONS ---
+^[0-9]+$        : Line contains ONLY numbers.
+^$              : Line is completely empty.
+(abc){3,}       : Sequence "abc" repeated at least 3 times.
+======================================================================
