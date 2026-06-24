@@ -1,0 +1,1 @@
+I sketched all the courses and materials from the exam papers you will need. Except I think one type of parsing, every theoretical aspect is embedded in one of those papers. The first section includes the graphs and the second one focuses on the exercises with tables and different parsing methods. If this was useful to you , you can help me with a star on my GitHub:D
