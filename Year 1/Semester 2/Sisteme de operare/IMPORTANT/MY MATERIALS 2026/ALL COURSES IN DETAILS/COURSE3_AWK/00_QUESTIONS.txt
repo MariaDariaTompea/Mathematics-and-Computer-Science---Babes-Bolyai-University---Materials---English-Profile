@@ -1,0 +1,125 @@
+======================================================================
+              AWK & REGEX EXAM PRACTICE EXERCISES
+======================================================================
+
+🟢 EASY EXERCISES (1 – 7)
+----------------------------------------------------------------------
+
+1. Find all the usernames that logged in from "economica" on a Sunday.
+   Use an input file structured like `last.fake` to print the first 
+   field (usernames) only for entries where the login happened on 
+   a Sunday ("Sun") and contained the location "economica". 
+   Ensure the final output contains only unique names.
+
+2. Print Specific Fields Conditionally.
+   Write an AWK command to print the first, second, and last field 
+   of any line that contains more than 5 fields.
+
+3. Filter by Username Character & ID Divisibility.
+   Given a file formatted like `/etc/passwd` (fields separated by `:`), 
+   find all lines where the username (1st field) starts with the 
+   letter "m" and the User ID (3rd field) is exactly divisible by 7. 
+   Print their full name (5th field).
+
+4. Dynamic Field Processing.
+   Read a text file and for each line, if the line has an odd number 
+   of fields, print the current line number (NR) followed by the 
+   content of the field exactly in the middle of that line.
+
+5. Calculate Average PID.
+   Process a system process snapshot file (`ps.fake`). Ignore the 
+   header line containing "UID". Calculate and print the arithmetic 
+   average of all process IDs (PIDs found in the 2nd field).
+
+6. Filter by File Properties.
+   Parse the output of a detailed directory listing (`ls -l`). Filter 
+   for lines representing regular files (where the 1st field starts 
+   with `-`) that are strictly smaller than 100 bytes, and print 
+   their filenames (the last field).
+
+7. Vowel Terminated Lines.
+   Count and print how many lines in a given text file end with a 
+   vowel (uppercase or lowercase).
+
+
+🟡 MEDIUM EXERCISES (8 – 12)
+----------------------------------------------------------------------
+
+8. The Late-Night Logins.
+   Analyze a log file (`last.fake`). Extract the username ($1) and 
+   login time (typically formatted as HH:MM in field 7). Print 
+   distinct usernames who logged in during or after the 23rd hour 
+   (11 PM).
+
+9. Field-Swapping Transformation.
+   For every line in a text file that contains at least 4 fields, 
+   swap the 2nd field with the next-to-last field, and print the 
+   modified full line.
+
+10. Positional String Verification.
+    Print only the lines from a file that have an odd length (number 
+    of characters) AND both start and end with a vowel.
+
+11. Summing Targeted Process IDs.
+    Given the output of `ps -ef`, find all processes that are running 
+    any of the following editors: "vim", "nano", or "emacs". Sum up 
+    their process IDs (2nd field) and print the total in the format 
+    "Sum: X".
+
+12. Complete Line Digit Filtering.
+    Calculate the sum of all whitespace-separated integers in a text 
+    file, but *only* parse lines that consist entirely of sequences 
+    of integers and spaces.
+
+
+🔴 HARD EXERCISES (13 – 20)
+----------------------------------------------------------------------
+
+13. Dynamic Bound Field Printing.
+    Print the first 4 fields from each even-numbered line of a file. 
+    If a line contains fewer than 4 fields, safely print all 
+    available fields from that line without leaving trailing spaces.
+
+14. Even-Length Comma Symmetric Field Processing.
+    For lines using a comma `,` separator that contain an even 
+    number of fields:
+    - If the line has exactly 2 fields, print both.
+    - If it has more than 2 fields, print the first field, the two 
+      middle fields, and the very last field.
+
+15. Associative Array Aggregation with Length Caps.
+    Read system snapshot records (`ps -ef`). Using an AWK script, 
+    group and calculate the sum of PIDs ($2) for each unique 
+    username ($1), but *only* if the username's string length is 4 
+    characters or fewer. Print the usernames and their respective 
+    PID sums.
+
+16. Structural Inversion & Field Nullification.
+    For each line of a file, blank out (`""`) every even-positioned 
+    field (2nd, 4th, 6th, etc.) so that only the odd-positioned 
+    fields are visible when printing the full line string ($0).
+
+17. Duplicate Line Tracking Natively in AWK.
+    Replicate the functionality of `sort | uniq -c | awk ...` tracking 
+    duplicate lines from a file using *only* a single AWK invocation 
+    (leverage internal associative arrays to count line occurrences 
+    and identify how many lines appear more than once).
+
+18. Conditional Cross-Field Evaluation.
+    Print lines where the multiplication of the 2nd numerical field 
+    ($2) and the next-to-last field ($(NF-1)) yields an absolute value 
+    greater than 500. Ensure the line safe-guards against evaluating 
+    lines containing fewer than 3 fields.
+
+19. Custom Formatting Component Counter.
+    Given a log where fields are separated by a space, identify lines 
+    where the last field ($NF) matches an IP address pattern 
+    (approximated as 4 blocks of numbers separated by dots, e.g., 
+    192.168.1.1). Count how many such lines exist in total.
+
+20. Matrix Transposition Emulation (Dynamic Rows to Columns).
+    Write an AWK command that aggregates field data per column across 
+    all rows. Compute and print the total sum of numerical values for 
+    Column 1, Column 2, and Column 3 independently over the entire 
+    file lifecycle.
+======================================================================

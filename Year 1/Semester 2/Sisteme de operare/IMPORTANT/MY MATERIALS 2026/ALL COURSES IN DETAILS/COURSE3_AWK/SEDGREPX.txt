@@ -1,0 +1,231 @@
+===============================================================================
+               OPERATING SYSTEMS: GREP AND SED TEACHING EXERCISES
+===============================================================================
+
+-------------------------------------------------------------------------------
+[SECTION 1: CORE UTILITY MODES]
+-------------------------------------------------------------------------------
+
+A. Search and Replace Subscriptions
+-----------------------------------
+Command Blueprint:
+  sed -E "s/regex/replacement/flags" input_file.txt
+
+Operational Concepts:
+  * The 's' operator explicitly declares the substitution action[cite: 557, 558].
+  * The forward slash (/) works as a visual expression separator[cite: 559]. The 
+    first character immediately following the 's' operator sets the boundary 
+    token. Alternative boundary symbols can be chosen to bypass tedious backslash 
+    escaping (e.g., sed -E "s,regex,replacement,flags")[cite: 559, 560].
+  * Execution Flags[cite: 557]:
+    - 'g' (Global) forces replacement of every single pattern match found along 
+      the targeted line layout instead of changing just the first instance[cite: 561, 562].
+    - 'i' (Case-Insensitive) commands target evaluations to entirely disregard 
+      the differences between lowercase and uppercase states[cite: 561, 564].
+  * Functional Backreferences: The replacement text pattern block can reference 
+    distinct expression sub-groups matched within the active regex layout by 
+    employing sequential numeric markers (\1, \2, \3, etc.)[cite: 565].
+
+B. Character Transliterations
+-----------------------------
+Command Blueprint:
+  sed -E "y/source_characters/target_replacement/" input_file.txt
+
+Operational Concepts:
+  * The 'y' character operator establishes a literal character translational 
+    mapping sequence[cite: 567, 568].
+  * Architectural Restriction: The source_characters translation list and the 
+    target_replacement translation list must share identical positional string 
+    lengths[cite: 572].
+
+C. Pattern-Based Line Deletions
+-------------------------------
+Command Blueprint:
+  sed -E "/regex/d" input_file.txt
+
+Operational Concepts:
+  * The trailing operation switch 'd' directs the engine to discard matching 
+    lines entirely, omitting them from the generated text print stream[cite: 574, 577].
+
+
+-------------------------------------------------------------------------------
+[SECTION 2: COMPREHENSIVE PRACTICAL PROBLEM MATRIX]
+-------------------------------------------------------------------------------
+
+PART A: PURE GREP AND SED PRACTICAL PROBLEMS
+============================================
+
+1. Identify Non-Empty Lines
+   Objective   : Display lines containing data records while omitting blank spans[cite: 524].
+   Command Line: grep -E "." a.txt [cite: 525]
+
+2. Identify Empty Lines
+   Objective   : Filter lines to expose strictly unpopulated text strings[cite: 526].
+   Command Line: grep -E "^$" a.txt [cite: 528]
+
+3. Count File Quantities using grep
+   Objective   : Quantify the general line count of a targeted document file without 
+                 printing its contents[cite: 2347].
+   Command Line: grep -E -c ".*" input.txt [cite: 2348]
+
+4. Extract Explicit Passwd Accounts
+   Objective   : Filter account items to discover username profiles starting strictly 
+                 with the token string "dan"[cite: 505].
+   Command Line: grep -E -i "^dan:" /etc/passwd [cite: 507]
+
+5. Search Accounts without Digits
+   Objective   : Expose target profile definitions whose primary system identifiers 
+                 contain zero numerical digits[cite: 508].
+   Command Line: grep -E "^[^0-9]+:" /etc/passwd [cite: 509]
+
+6. Identify Accounts with Vowel Multiplicity
+   Objective   : Locate records containing at least two vowels inside the isolated boundaries 
+                 of the targeted username space[cite: 510, 511].
+   Command Line: grep -i "^[^:]*[aeiou][^:]*[aeiou][^:]*:" /etc/passwd [cite: 512]
+   Alternative Variant (Interval Expression Engine):
+                 grep -E -i "^[^:]*([aeiou][^:]*){2,}:" /etc/passwd [cite: 513]
+
+7. Filter Non-Bash Terminal Records
+   Objective   : Pull system profile layouts whose ending interactive target does not 
+                 match the standard "/bash" execution shell[cite: 518].
+   Command Line: grep -E -v "/bash$" /etc/passwd [cite: 520]
+
+8. Isolate Exact Field Matches
+   Objective   : Discover account configurations hosting the standalone string "ion" 
+                 while dropping records containing embedded instances like "Simion"[cite: 521].
+   Command Line: grep -E -i "^([^:]*:){4}[^:]*\<ion\>" /etc/passwd [cite: 522]
+
+9. Identify Document Email Formats
+   Objective   : Match and display structural string layouts conforming to standard internet 
+                 email addresses[cite: 534].
+   Command Line: grep -E -i "\<[^@*!?]+@[a-z0-9-]+(\.[a-z0-9-]+)+\>" a.txt [cite: 543]
+
+10. Duplicate File Numbers Using Captures
+    Objective   : Isolate consecutive base-10 numerical sets and duplicate them in place 
+                  (e.g., translating line sample string "56.34" into "5656.3434") [cite: 2287, 2288].
+    Command Line: sed -E "s/([0-9]+)/\1\1/g" test_input_1 [cite: 2289]
+
+11. Delete Spacing Extensions via Characters
+    Objective   : Strip out any secondary lingering string arguments tracking behind the final 
+                  whitespace character division boundary[cite: 2290].
+    Command Line: sed -E "s/([[:space:]])[^[:space:]]*$/\1/" test_input_2 [cite: 2295]
+
+12. Transliterate Vowel Formats
+    Objective   : Shift lowercase vowel characters into a uniform uppercase alignment throughout 
+                  the input text document[cite: 582].
+    Command Line: sed -E "y/aeiou/AEIOU/" /etc/passwd [cite: 584]
+
+13. Drop Lengthy Numerical Lines
+    Objective   : Invalidate and purge lines containing a combined series of 5 or more 
+                  numerical digits[cite: 585].
+    Command Line: sed -E "/[0-9]{5,}/d" /etc/passwd [cite: 586]
+
+14. Swap Adjacent Characters Using Capture Groups
+    Objective   : Invert the physical layout sequence of matching paired letters across 
+                  active text rows[cite: 588].
+    Command Line: sed -E "s/([a-z])([a-z])/\2\1/gi" /etc/passwd [cite: 589]
+
+15. Duplicate Line Vowels
+    Objective   : Find each case-insensitive vowel character present and double its footprint[cite: 590].
+    Command Line: sed -E "s/([aeiou])/\1\1/gi" /etc/passwd [cite: 592]
+
+16. Transliterate Characters (Leet Speak Translation)
+    Objective   : Substitute structural characters with alphanumeric equivalents via literal single-character 
+                  index matching translations (e.g., transforming "Bogdan" into "B09d4n")[cite: 594].
+    Command Line: sed -E "y/elaoszbg/31405289/" /etc/passwd [cite: 596]
+
+17. Wrap Vowel Sequences in Parentheses
+    Objective   : Pinpoint any localized string block featuring three or more consecutive vowels 
+                  and enclose the sequence in parentheses[cite: 597].
+    Command Line: sed -E "s/([aeiou]{3,})/(\1)/gi" /etc/passwd [cite: 599]
+
+18. Isolate Posix Fields via Field Swapping
+    Objective   : Parse structural dataset elements by reordering the second and third parameters 
+                  of a colon-delimited text layout[cite: 2303].
+    Command Line: sed -E "s/^([^:]*):([^:]*):([^:]*)/\1:\3:\2/" /etc/passwd [cite: 2304]
+
+19. Identify Enclosed Word Patterns
+    Objective   : Isolate text strings bound safely inside explicit caret boundaries (^) that 
+                  contain at most 5 vowels total[cite: 2305].
+    Command Line: grep -E "\^([^aeiouAEIOU]*[aeiouAEIOU][^aeiouAEIOU]*){0,5}\^" test_input_4 [cite: 2309]
+
+20. Clear Lowercase Tokens
+    Objective   : Target and clear the first occurrence of a standalone structural word built 
+                  exclusively of lowercase letters[cite: 2310].
+    Command Line: sed -E "s/\<[a-z]+\>//" test_input_1 [cite: 2311]
+
+21. Detect User Permission Layouts
+    Objective   : Read active system folder profiles via long-form file records ('ls -l') to 
+                  isolate regular files maintaining explicit read attributes ('r') everywhere[cite: 2319, 2343].
+    Command Line: ls -l | grep -E "^-(r..){3}" [cite: 2344]
+
+22. Identify Vowel Prefixes
+    Objective   : Extract every operational account user listing whose username token starts with 
+                  a valid case-insensitive vowel character[cite: 2341].
+    Command Line: grep -E -i "^[aeiou]" /etc/passwd [cite: 2342]
+
+
+PART B: INTEGRATED PRACTICE PIPELINE PROBLEMS
+=============================================
+
+1. Identify User Logs by Location and Day
+   Objective   : Query login tracking history files to extract individual names logging in from 
+                 the remote location node 'economica' specifically on Sundays.
+   Pipeline    : last | grep -E "economica" | grep -E "Sun" | cut -d' ' -f1 | sort | uniq
+
+2. Identify Late-Night User Logins
+   Objective   : Detect individual profile log accounts establishing operational connections late at 
+                 night inside the exclusive 11 PM boundary hour span (23:00 to 23:59).
+   Pipeline    : last | head -n -1 | sed -E "s/;/,/g" | grep -E "[[:space:]]23:[0-9]{2}[[:space:]]" | cut -d' ' -f1 | sort | uniq
+
+3. Filter Processes by Specific User Directories
+   Objective   : Process current core system process status fields to safely extract and review student user 
+                 accounts while scrubbing away administrative root records and standard table header entries[cite: 1148, 1149].
+   Pipeline    : ps -ef | grep -E -v "^root" | tail -n +2 [cite: 1151, 1152, 1153]
+
+4. Find Active Terminal IDs
+   Objective   : Identify the collection of unique active system terminal line devices (TTY) 
+                 currently mapped to the root user[cite: 2315].
+   Pipeline    : cat ps.fake | grep -E "^root\>" | awk '{print $6}' | sort | uniq
+
+5. Match Numeric Account Formats
+   Objective   : Query user account rows to parse out account identities finishing with the 
+                 exact operational trailing designation suffix "88".
+   Pipeline    : grep -E "^[^:]*88:" /etc/passwd | cut -d: -f5
+
+6. Isolate Numerical Limits
+   Objective   : Target profile lines tracking user account IDs spanning exactly three digital figures 
+                 and beginning with the numeric layout sequence "23".
+   Pipeline    : grep -E "^[^:]*:[^:]*:23[0-9]:" /etc/passwd | cut -d: -f5
+
+7. Isolate Terminal Node Targets
+   Objective   : Interrogate systemic connection logs to discover individual account signatures starting 
+                 with the character letter "t" logged into system terminal line node 'pts/9'.
+   Pipeline    : last | grep -E "^t[^[:space:]]*[[:space:]]+pts/9\>" | cut -d' ' -f1 | sort | uniq
+
+8. Duplicate Stream Matches
+   Objective   : Track dynamic runtime process signatures to find active usernames initiating with 
+                 the character letter "r", filtering individual duplicates and expanding their 
+                 vowels sequentially into a doubled string presence.
+   Pipeline    : ps -ef | grep -E "^r[a-zA-Z0-9]*\>" | cut -d' ' -f1 | sort | uniq | sed -E "s/([aeiou])/\1\1/g"
+
+9. Clear Character Records
+   Objective   : Strip out all alphabetic letters, numerical values, and blank spacing boundaries completely 
+                 from system user lists, exposing only raw operational structure separator elements.
+   Pipeline    : sed -E "s/[a-zA-Z0-9[:space:]]//g" /etc/passwd | sort | uniq
+
+10. Filter Text to Specific Target Matches
+    Objective   : Scrub clean every element inside the core system user profile database except for instances 
+                  matching the target lowercase alphanumeric letter entry "r".
+    Pipeline    : sed -E "s/[^r]//g" /etc/passwd | sort | uniq
+
+11. Count Account Operations
+    Objective   : Audit raw system log profiles to tally and report the direct numeric occurrence frequency 
+                  of individual user accounts interacting with the environment[cite: 2345].
+    Pipeline    : last | cut -d' ' -f1 | grep -E -v "^$" | sort | uniq -c | sort -rn [cite: 2346]
+
+12. Suppress Terminal Errors
+    Objective   : Navigate target directory file paths recursively to identify active shell scripts while cleanly 
+                  suppressing system access permissions errors from output metrics[cite: 699, 700].
+    Pipeline    : find /etc -name "*.sh" 2>/dev/null | sed -E "s,/[^/]*$,," | sort | uniq [cite: 703]
+===============================================================================
