@@ -1,0 +1,1705 @@
+================================================================================
+CHEAT SHEET EXAMEN SISTEME DE OPERARE
+Regex / Grep / Sed / Awk / Bash / Procese / Threaduri / Pipe / FIFO
+TOMPEA MARIA_DARIA
+================================================================================
+
+
+################################################################################
+PARTEA 1: EXPRESII REGULATE (REGEX)
+################################################################################
+
+--------------------------------------------------------------------------------
+1.1 TIPURI DE REGEX IN LINUX
+--------------------------------------------------------------------------------
+BRE (Basic Regular Expression)  -> grep, sed (fara -E/-r)
+    - metacaracterele + ? | ( ) { } trebuie ESCAPATE cu \ ca sa aiba sens special
+    - ex: grep 'a\{3\}' , grep 'a\+b'
+
+ERE (Extended Regular Expression) -> grep -E (egrep), awk, sed -E (sau sed -r)
+    - metacaracterele + ? | ( ) { } au sens special FARA backslash
+
+--------------------------------------------------------------------------------
+1.2 METACARACTERE DE BAZA (valabile si BRE si ERE, fara escape)
+--------------------------------------------------------------------------------
+.        orice caracter (exact 1)
+*        0 sau mai multe aparitii ale caracterului/grupului anterior
+^        inceput de linie (in afara [ ]) 
+$        sfarsit de linie
+[...]    o clasa de caractere, ex [abc], [a-z], [0-9], [^0-9] (negatie)
+[^...]   negatia clasei
+\        escape (anuleaza sensul special, sau il activeaza in BRE pt + ? | ( ) { })
+
+--------------------------------------------------------------------------------
+1.3 METACARACTERE EXTINSE (necesita -E sau \ in BRE)
+--------------------------------------------------------------------------------
++            1 sau mai multe aparitii           BRE: a\+   ERE: a+
+?            0 sau 1 aparitie (optional)         BRE: a\?   ERE: a?
+|            SAU (alternativa)                   BRE: a\|b  ERE: a|b
+( )          grupare                             BRE: \(ab\)+  ERE: (ab)+
+{n}          exact n aparitii                    BRE: a\{n\}  ERE: a{n}
+{n,}         cel putin n aparitii                BRE: a\{n,\} ERE: a{n,}
+{n,m}        intre n si m aparitii               BRE: a\{n,m\} ERE: a{n,m}
+
+--------------------------------------------------------------------------------
+1.4 CLASE DE CARACTERE PREDEFINITE (POSIX)
+--------------------------------------------------------------------------------
+[:alpha:]    litere (mari+mici)         [:digit:]   cifre 0-9
+[:alnum:]    litere + cifre             [:space:]   spatiu, tab, newline
+[:upper:]    litere mari                [:lower:]   litere mici
+[:punct:]    punctuatie
+
+Se folosesc DOAR in interiorul unei clase: [[:digit:]] , [[:alpha:][:digit:]]
+
+--------------------------------------------------------------------------------
+1.5 EXEMPLE REZOLVATE REGEX
+--------------------------------------------------------------------------------
+
+EX 1) Regex pt "abc" (case-insensitive) repetat de CEL PUTIN 3 ori:
+    ^([Aa][Bb][Cc]){3,}$
+
+    Explicatie:
+    - [Aa][Bb][Cc] -> secventa "abc" indiferent de majuscule/minuscule (o litera cate un caz)
+    - ( ... ){3,}  -> grupul se repeta minim 3 ori (ERE, fara escape la {})
+    - ^ si $       -> stringul e format DOAR din aceste repetitii (nimic in plus)
+    NOTA: daca vrei case-insensitive global poti folosi grep -Ei cu regex ^(abc){3,}$
+
+EX 2) Regex care accepta numere binare divizibile cu 4, fara 0 redundant la inceput:
+    Un numar binar e divizibil cu 4 daca se termina in "00".
+    Nu trebuie sa inceapa cu 0 redundant -> singurul caz cu 0 la inceput permis e "0" insusi,
+    dar aici trebuie sa se termine in 00, deci:
+    ^(0|1[01]*00)$
+
+    Explicatie:
+    - 0                -> cazul special: numarul 0 (0 e divizibil cu 4, nu are 0 redundant)
+    - 1[01]*00         -> incepe cu 1 (nu redundant), urmat de orice combinatie de 0/1, 
+                          si se termina obligatoriu in "00" (divizibil cu 4)
+    - | intre cele doua cazuri, ^ $ delimiteaza tot stringul
+
+EX 3) Regex care accepta orice numar nenegativ multiplu de 5 (3 variante):
+    Un numar e multiplu de 5 daca ultima cifra e 0 sau 5.
+    a) ^[0-9]*[05]$
+    b) ^(0|[1-9][0-9]*)*[05]$    (fara zerouri redundante la inceput, varianta stricta)
+    c) ^[0-9]+[05]$
+
+EX 4) Regex care accepta orice secventa de lungime PARA de cuvinte mici separate prin
+      spatii, unde paritatea lungimii cuvantului trebuie sa coincida cu paritatea pozitiei lui:
+    ^([a-z]([a-z][a-z])* ([a-z][a-z])*[a-z])( ([a-z]([a-z][a-z])* ([a-z][a-z])*[a-z]))*$
+
+    Explicatie (pe perechi de 2 cuvinte, cuvant impar=lungime impara, cuvant par=lungime para):
+    - [a-z]([a-z][a-z])*     -> un cuvant de lungime IMPARA (pozitia impara -> lungime impara)
+    - ([a-z][a-z])*[a-z]     -> ATENTIE, gresit; varianta corecta pt lungime PARA e ([a-z][a-z])+
+    Varianta corecta:
+    ^([a-z]([a-z][a-z])* ([a-z][a-z])+)( ([a-z]([a-z][a-z])* ([a-z][a-z])+))*$
+    - prima jumatate a perechii: cuvant lungime impara (pozitie impara)
+    - a doua jumatate a perechii: cuvant lungime para (pozitie para), minim 2 litere
+    - grupul de 2 cuvinte se repeta de 1+ ori -> numar total de cuvinte e PAR
+
+EX 5) Regex care accepta sir format din secvente alternante litera-cifra (litera intai):
+    ^([a-zA-Z][0-9])+$    sau incepand cu cifra: ^([0-9][a-zA-Z])+$
+    Pt "oricare ordine, alternant, poate incepe cu oricare": 
+    ^(([a-zA-Z][0-9])+[a-zA-Z]?|([0-9][a-zA-Z])+[0-9]?)$
+
+
+################################################################################
+PARTEA 2: GREP
+################################################################################
+
+--------------------------------------------------------------------------------
+2.1 SINTAXA
+--------------------------------------------------------------------------------
+grep [OPTIUNI] 'PATTERN' fisier
+
+--------------------------------------------------------------------------------
+2.2 OPTIUNI IMPORTANTE
+--------------------------------------------------------------------------------
+-E    Extended regex (ERE) - la fel ca egrep
+-i    ignora case (majuscule/minuscule)
+-v    afiseaza liniile care NU se potrivesc (inversare)
+-c    afiseaza doar NUMARUL de linii care se potrivesc
+-n    afiseaza numarul liniei impreuna cu linia
+-o    afiseaza doar partea din linie care s-a potrivit (nu toata linia)
+-l    afiseaza doar numele fisierelor care contin potriviri
+-L    afiseaza doar numele fisierelor care NU contin potriviri
+-w    potriveste cuvinte intregi (word boundary)
+-x    potriveste linia INTREAGA (echivalent cu ^pattern$)
+-r/-R recursiv prin directoare
+-A n  afiseaza si n linii DUPA potrivire (After)
+-B n  afiseaza si n linii INAINTE (Before)
+-C n  afiseaza n linii inainte SI dupa (Context)
+-f fisier  citeste patternurile dintr-un fisier
+-e pattern folosire pattern multiplu: grep -e 'a' -e 'b'
+
+--------------------------------------------------------------------------------
+2.3 EXEMPLE REZOLVATE GREP
+--------------------------------------------------------------------------------
+
+EX 1) Linii de lungime IMPARA care incep si se termina cu vocala:
+    grep -E '^[aeiouAEIOU](.{0,}[aeiouAEIOU])?$' fisier | awk 'length($0)%2==1'
+    -- varianta 100% grep (fara awk), pe caractere pereche intre prima si ultima:
+    grep -xE '[aeiouAEIOU](..)*[aeiouAEIOU]|[aeiouAEIOU]' fisier
+    Explicatie: 
+    - daca linia are lungime 1: e un singur caracter care trebuie sa fie vocala -> [aeiouAEIOU]
+    - daca linia are lungime >1 si impara: primul si ultimul caracter = vocala, iar intre ele
+      un numar PAR de caractere oarecare -> (..)*  (perechi de caractere, deci total impar)
+    - -x forteaza potrivirea liniei INTREGI
+
+EX 2) 5 comenzi GREP care afiseaza liniile ce contin litera "a" (mare sau mica):
+    a) grep -i 'a' fisier
+    b) grep -E 'a|A' fisier
+    c) grep '[aA]' fisier
+    d) grep '[Aa]' fisier
+    e) grep -i '[a]' fisier
+
+EX 3) GREP: linii cu cel putin 3 vocale (nu neaparat consecutive) intre care nu apar cifre:
+    grep -E '[aeiouAEIOU]([^0-9]*[aeiouAEIOU]){2,}' fisier
+    Explicatie: prima vocala, apoi de cel putin 2 ori: (orice, dar NU cifre)* urmat de o vocala.
+    [^0-9]* permite orice caracter (litere, simboluri) dar interzice cifrele intre vocale.
+
+EX 4) Linii care contin "a" dar NU contin "b":
+    grep 'a' fisier | grep -v 'b'
+    -- sau intr-o singura comanda (ERE, negatie prin lookahead nu exista in grep clasic,
+       deci se combina cele doua conditii via pipe, e cea mai simpla solutie general acceptata)
+
+EX 5) Linii care contin exclusiv o secventa alternanta litera-cifra (ex: a0g, 1r5m):
+    a) grep -xE '([a-z][0-9])+[a-z]?' fisier
+    b) grep -xE '([0-9][a-z])+[0-9]?' fisier
+    c) grep -xE '([a-z][0-9])+[a-z]?|([0-9][a-z])+[0-9]?' fisier
+
+EX 6) Linii care apar o singura data in fisier (fara duplicate):
+    sort fisier | uniq -u
+    (grep singur nu poate; se combina cu sort+uniq -u, e o comanda shell tipica de examen)
+
+
+################################################################################
+PARTEA 3: SED
+################################################################################
+
+--------------------------------------------------------------------------------
+3.1 SINTAXA GENERALA
+--------------------------------------------------------------------------------
+sed [OPTIUNI] 'COMANDA' fisier
+sed [OPTIUNI] -e 'cmd1' -e 'cmd2' fisier    -- mai multe comenzi (echivalent cu 'cmd1;cmd2')
+sed [OPTIUNI] -f script.sed fisier          -- citeste comenzile dintr-un fisier
+
+Cum functioneaza sed (IMPORTANT de inteles, nu doar de memorat comenzi):
+- sed citeste fisierul LINIE CU LINIE
+- fiecare linie e incarcata in "pattern space" (un buffer temporar)
+- se aplica pe rand TOATE comenzile din scriptul sed asupra acelei linii
+- la final, DACA nu s-a folosit -n, continutul pattern space-ului e AFISAT automat
+- se trece la linia urmatoare si se repeta
+
+--------------------------------------------------------------------------------
+3.2 OPTIUNI IMPORTANTE
+--------------------------------------------------------------------------------
+-n       suprima afisarea AUTOMATA de la finalul fiecarui ciclu (nimic nu se afiseaza
+         decat daca o comanda "p" o cere explicit) -- se foloseste aproape mereu impreuna cu p
+-E / -r  activeaza ERE (regex extins: + ? | ( ) {} FARA backslash). Fara -E, sed foloseste
+         BRE (ai nevoie de \+ \? \| \( \) \{ \} ca sa le dai sens special)
+-i       modifica fisierul DIRECT pe disc (in-place), fara sa afiseze nimic la consola
+-i.bak   ca -i, dar salveaza mai intai o copie de backup cu extensia .bak
+
+--------------------------------------------------------------------------------
+3.3 STRUCTURA UNEI COMENZI SED
+--------------------------------------------------------------------------------
+[adresa]comanda[argumente]
+
+O comanda sed se aplica DOAR liniilor indicate de adresa (daca adresa lipseste, comanda
+se aplica pe TOATE liniile).
+
+--- TIPURI DE ADRESA ---
+3            linia cu numarul 3
+2,5          intervalul de linii 2 pana la 5 (inclusiv)
+/regex/      toate liniile care se potrivesc cu regex-ul (adresare prin continut, nu numar)
+/regex/,/re2/  de la prima linie care matcheaza regex, pana la prima linie care matcheaza re2
+$            ULTIMA linie a fisierului
+1~2          adresare cu PAS: prima linie e linia 1, apoi din 2 in 2 -> liniile 1,3,5,7,...
+             (adica toate liniile IMPARE). Sintaxa generala este start~pas
+0~3          liniile 3,6,9,... (multipli de 3)
+!            NEGAREA adresei -- se pune DUPA adresa, inseamna "toate liniile CARE NU 
+             se potrivesc cu adresa". Ex: /7/!p inseamna "afiseaza liniile care NU contin 7"
+
+--------------------------------------------------------------------------------
+3.4 COMENZI SED IMPORTANTE
+--------------------------------------------------------------------------------
+s/regex/inlocuire/[flags]
+    Comanda de SUBSTITUTIE: cauta regex in linie si il inlocuieste. FARA flag g, 
+    inlocuieste DOAR PRIMA aparitie de pe linie.
+    FLAGS posibile (se pun dupa a treia bara /):
+        g      global -- inlocuieste TOATE aparitiile de pe linie (nu doar prima)
+        p      afiseaza linia dupa substitutie (util cu -n, ca sa afisezi doar liniile
+               unde s-a facut efectiv o inlocuire)
+        i / I  ignore case (ignora majuscule/minuscule la CAUTARE, GNU sed)
+        N      (un numar, ex: 2) inlocuieste doar a N-a aparitie de pe linie (nu prima)
+        Ng     combinatie: inlocuieste de la a N-a aparitie INCOLO (toate incepand cu a N-a)
+        w file scrie liniile modificate si intr-un fisier separat
+
+d          STERGE linia curenta din output (nu se mai afiseaza, ciclul trece direct
+           la linia urmatoare, ignorand orice comanda de dupa d pe acea linie)
+p          AFISEAZA (print) linia curenta -- utila mai ales cu -n, ca sa controlezi
+           EXACT ce se afiseaza (fara -n, ai vedea linia de 2 ori: o data de la p, 
+           o data de la afisarea automata a ciclului)
+n          incarca URMATOAREA linie in pattern space, dupa ce a afisat-o pe cea curenta
+           (daca nu e -n) -- practic "trece mai departe", pastrand comenzile ce urmeaza
+           sa se aplice pe linia noua
+N          ADAUGA linia urmatoare la sfarsitul pattern space-ului curent (le CONCATENEAZA,
+           separate de caracterul \n) -- util cand trebuie comparate/combinate 2 linii deodata
+q          STOP -- opreste procesarea imediat (nu mai citeste linii noi din fisier)
+a\
+text       adauga (append) "text" DUPA linia curenta, in output
+i\
+text       insereaza (insert) "text" INAINTE de linia curenta, in output
+y/abc/xyz/ TRANSLITEREAZA caracter cu caracter (a->x, b->y, c->z), similar cu tr
+
+--- ETICHETE SI SALTURI (pentru bucle / repetitii in sed) ---
+:eticheta  defineste o ETICHETA (un punct de reper) in script, cu numele "eticheta"
+b eticheta salt NECONDITIONAT la eticheta respectiva (branch)
+t eticheta salt la eticheta CONDITIONAT: doar daca ULTIMA comanda "s" de pe acest ciclu
+           A REUSIT sa faca o substitutie. Practic: "daca s-a inlocuit ceva, sari inapoi
+           la eticheta" -- se foloseste pentru a REPETA o substitutie pana cand nu mai
+           gaseste nimic de inlocuit pe linia curenta (echivalentul unui "while" in sed)
+T eticheta ca t, dar sare DACA substitutia NU a reusit (conditie inversa)
+
+--- SIMBOLURI SPECIALE IN PARTEA DE INLOCUIRE (dupa a doua bara din s/../../) ---
+&          reprezinta TOT TEXTUL care s-a potrivit cu regex-ul de cautare (util cand
+           vrei sa adaugi ceva in jurul potrivirii, fara sa o rescrii). Ex: s/[0-9]+/(&)/
+           pune parenteze in jurul oricarui numar
+\1 \2 ...  reprezinta continutul grupurilor de capturare NUMEROTATE din regex, in ordinea
+           in care apar parantezele -- grupurile se definesc cu \( \) in BRE, sau simplu
+           ( ) in ERE (-E). Ex: s/([a-z]+) ([a-z]+)/\2 \1/ interschimba doua cuvinte
+
+--------------------------------------------------------------------------------
+3.5 EXEMPLE REZOLVATE SED (fiecare simbol folosit e explicat)
+--------------------------------------------------------------------------------
+
+EX 1) Interschimba al doilea cuvant cu penultimul cuvant pe fiecare linie
+      (linia are minim 4 cuvinte separate prin spatii). 2 comenzi SED:
+
+    Comanda A (daca stim ca sunt EXACT 4 cuvinte):
+    sed -E 's/^([a-zA-Z]+) ([a-zA-Z]+) ([a-zA-Z]+) ([a-zA-Z]+)$/\1 \3 \2 \4/' fisier
+
+    Simboluri folosite:
+    - -E        activeaza ERE, ca sa scriem ( ) fara backslash pentru grupare
+    - ^ ... $   ancoreaza regex-ul la INCEPUTUL si SFARSITUL liniei (toata linia trebuie
+                sa se potriveasca exact patternului, nu doar o parte din ea)
+    - ([a-zA-Z]+)   grup de capturare = un cuvant (una sau mai multe litere); avem 4 grupuri,
+                numerotate \1 \2 \3 \4 in ordinea parantezelor
+    - in inlocuire scriem \1 \3 \2 \4: primul si ultimul cuvant raman pe loc, iar cuvantul
+      2 (\2) e interschimbat cu cuvantul 3 = penultimul cand sunt exact 4 (\3)
+
+    Comanda B (varianta GENERALA, minim 4 cuvinte, restul raman pe loc):
+    sed -E 's/^([a-zA-Z]+) ([a-zA-Z]+) ((.* )?)([a-zA-Z]+) ([a-zA-Z]+)$/\1 \5 \3\2 \6/' fisier
+
+    Simboluri noi fata de comanda A:
+    - ((.* )?)  grup \3: TOT ce se afla intre cuvantul 2 si penultimul cuvant, inclusiv
+                spatiile dintre ele; e opus cu ? deoarece la minimum 4 cuvinte, mijlocul
+                poate fi GOL (cand sunt EXACT 4 cuvinte, nu exista nimic intre cuvantul 2
+                si penultimul)
+    - .*        "orice caracter, de 0 sau mai multe ori" -- e folosit "lacom" (greedy), ia
+                cat mai mult posibil, dar regex-ul e construit sa lase totusi loc pentru
+                \5 si \6 la finalul liniei (motorul de regex face backtracking automat)
+    - \5 = penultimul cuvant, \6 = ultimul cuvant (ramane pe loc)
+    - in inlocuire: \1 (primul, neschimbat) \5 (PENULTIMUL, adus pe pozitia a doua)
+      \3 (mijlocul, neschimbat) \2 (AL DOILEA cuvant, dus pe pozitia penultimului)
+      \6 (ultimul, neschimbat)
+
+EX 2) Sterge TOATE secventele care contin cel putin o cifra, dintr-o linie cu
+      cuvinte (litere mici si/sau cifre) separate prin spatii. 2 comenzi SED:
+
+    Comanda A (repeta substitutia in bucla, pana nu mai gaseste nimic de sters):
+    sed -E ':a; s/(^| )[a-z0-9]*[0-9][a-z0-9]*( |$)/\1\2/; ta' fisier
+
+    Simboluri noi:
+    - :a        DEFINESTE o eticheta numita "a" (punct de reper pentru salt) -- nu face
+                nimic in sine, doar marcheaza o pozitie in script
+    - (^| )     grup \1: fie INCEPUTUL liniei (^), fie un spatiu -- delimitatorul din
+                stanga cuvantului cautat
+    - [a-z0-9]*[0-9][a-z0-9]*   un "cuvant" (litere mici/cifre) care contine OBLIGATORIU
+                cel putin o cifra undeva in el ([0-9] simplu, fara *, e pus in mijloc ca
+                sa garanteze minim o cifra; * inainte si dupa permite orice alte caractere)
+    - ( |$)     grup \2: delimitatorul din dreapta -- fie un spatiu, fie SFARSITUL liniei ($)
+    - \1\2      in inlocuire pastram delimitatorii (spatiile / inceput / sfarsit), dar
+                stergem cuvantul gasit intre ei (nu apare in partea de inlocuire)
+    - ta        SALT CONDITIONAT la eticheta "a", DAR NUMAI DACA substitutia "s" de mai
+                sus a REUSIT pe acest ciclu -- efectul e o BUCLA: sed reincearca aceeasi
+                substitutie iar si iar pe linia curenta, pana cand "s" nu mai gaseste
+                niciun cuvant cu cifra (nu mai reuseste), moment in care "t" nu mai sare
+                si sed trece la linia urmatoare din fisier
+
+    Comanda B (curata spatiile duble ramase dupa stergere):
+    sed -E 's/ +/ /g; s/^ //; s/ $//' fisier_rezultat
+    - s/ +/ /g  inlocuieste orice secventa de UNUL SAU MAI MULTE spatii consecutive
+                (ramase dupa ce s-au sters cuvinte din mijloc) cu UN SINGUR spatiu
+    - s/^ //    sterge un eventual spatiu ramas la INCEPUTUL liniei
+    - s/ $//    sterge un eventual spatiu ramas la SFARSITUL liniei
+    -- se ruleaza in lant: sed -E '...comanda_A...' fisier | sed -E 's/ +/ /g; s/^ //; s/ $//'
+
+EX 3) Afiseaza doar liniile care NU contin cifra 7 (2 comenzi SED):
+
+    Comanda A:
+    sed -n '/7/!p' fisier
+    - -n      suprima afisarea automata (altfel am vedea si liniile nedorite)
+    - /7/     adresa: toate liniile care CONTIN caracterul "7"
+    - !       NEAGA adresa -- deci "/7/!" inseamna "toate liniile care NU contin 7"
+    - p       afiseaza (explicit) liniile care se potrivesc adresei negate
+
+    Comanda B:
+    sed '/7/d' fisier
+    - /7/     adresa: liniile care contin "7"
+    - d       STERGE liniile respective din output -- ramane implicit tot restul (fara -n,
+              liniile care NU au fost sterse se afiseaza normal, automat, la finalul ciclului)
+
+EX 4) Sterge prima secventa nevida de litere mici dintr-o linie:
+
+    Comanda A:
+    sed -E 's/[a-z]+//' fisier
+    - [a-z]+    una sau mai multe litere mici consecutive
+    - //        inlocuire cu STRING GOL = stergere
+    - FARA flag g -> sed se opreste dupa PRIMA potrivire gasita pe linie (comportamentul
+      implicit al lui "s" e sa inlocuiasca doar prima aparitie)
+
+    Comanda B (echivalent, cu numarul de aparitie explicit):
+    sed -E 's/[a-z]+//1' fisier
+    - flag "1" = inlocuieste explicit a 1-a aparitie (identic cu lipsa flagului, scris
+      explicit pentru claritate)
+
+EX 5) Afiseaza doar liniile cu numar impar (linii 1,3,5,...):
+    sed -n '1~2p' fisier
+    - -n      suprima afisarea automata
+    - 1~2     adresare cu PAS: incepe de la linia 1, apoi din 2 in 2 linii -> 1,3,5,7,...
+              (formula generala start~pas)
+    - p       afiseaza explicit liniile care se potrivesc acestei adrese
+
+EX 6) Sterge liniile goale dintr-un fisier:
+    sed '/^$/d' fisier
+    - /^$/    adresa: linia in care imediat dupa inceput (^) vine direct sfarsitul ($),
+              adica o linie complet GOALA (fara niciun caracter intre ele)
+    - d       sterge liniile respective
+
+
+################################################################################
+PARTEA 4: AWK
+################################################################################
+
+--------------------------------------------------------------------------------
+4.1 SINTAXA GENERALA
+--------------------------------------------------------------------------------
+awk [OPTIUNI] 'PATTERN {ACTIUNE}' fisier
+awk 'BEGIN{...} PATTERN{ACTIUNE} END{...}' fisier
+
+- BEGIN{}  se executa O SINGURA DATA, inainte de citirea fisierului
+- END{}    se executa O SINGURA DATA, dupa citirea fisierului
+- PATTERN{ACTIUNE} se executa pentru FIECARE linie care se potriveste patternului
+  (daca lipseste pattern -> se aplica pe toate liniile; daca lipseste actiunea -> print implicit)
+
+--------------------------------------------------------------------------------
+4.2 OPTIUNI IMPORTANTE
+--------------------------------------------------------------------------------
+-F sep       seteaza separatorul de campuri (field separator), ex: -F':' sau -F','
+-v var=val   seteaza o variabila inainte de executie
+-f fisier    citeste programul awk dintr-un fisier
+
+--------------------------------------------------------------------------------
+4.3 VARIABILE PREDEFINITE
+--------------------------------------------------------------------------------
+$0        linia intreaga curenta
+$1,$2,..  campul 1, campul 2, etc.
+NF        Number of Fields - numarul de campuri de pe linia curenta
+NR        Number of Records - numarul liniei curente (contor global, de la inceputul input-ului)
+FNR       ca NR dar se reseteaza pt fiecare fisier nou (daca sunt mai multe fisiere)
+FS        Field Separator (separator de campuri, implicit spatiu/tab)
+OFS       Output Field Separator (separator la afisare cu print folosind ,)
+RS        Record Separator (implicit newline - separator intre linii)
+ORS       Output Record Separator
+FILENAME  numele fisierului curent procesat
+
+--------------------------------------------------------------------------------
+4.4 OPERATORI SI STRUCTURI
+--------------------------------------------------------------------------------
+== != < > <= >=      comparatii
+&& || !              logice
+~   !~               match / not-match cu o regex, ex: $1 ~ /^a/
+print , printf        afisare (printf ca in C: printf("%d\n", x))
+if(cond){...} else {...}
+for(i=0;i<NF;i++){...}
+while(cond){...}
+{ ... }               bloc de instructiuni
+
+--------------------------------------------------------------------------------
+4.5 FUNCTII AWK IMPORTANTE (BUILT-IN)
+--------------------------------------------------------------------------------
+length(s)        lungimea stringului s (sau lungimea $0 daca fara argument)
+substr(s,i,n)     substring din s, incepand de la pozitia i, n caractere
+index(s,t)        pozitia primei aparitii a lui t in s (0 daca nu exista)
+split(s,arr,sep)  imparte s in array-ul arr dupa separatorul sep, returneaza nr elemente
+sprintf(fmt,...)  formateaza un string (ca printf dar returneaza string in loc sa afiseze)
+toupper(s)/tolower(s)  conversie majuscule/minuscule
+gsub(regex,repl,s)   inlocuieste global in s (sau in $0 daca lipseste s)
+sub(regex,repl,s)    inlocuieste prima aparitie
+match(s,regex)       cauta regex in s, seteaza RSTART si RLENGTH
+sqrt, int, exp, log, sin, cos    functii matematice standard
+
+--------------------------------------------------------------------------------
+4.6 EXEMPLE REZOLVATE AWK
+--------------------------------------------------------------------------------
+
+EX 1) Produsul dintre al doilea si penultimul camp, daca linia are minim 3 campuri:
+    awk 'NF>=3{print $2*$(NF-1)}' fisier
+
+EX 2) Suma penultimului camp pe toate liniile:
+    awk '{s+=$(NF-1)} END{print s}' fisier
+
+EX 3) Suma tuturor numerelor dintr-un fisier (linii = cifre separate prin spatii):
+    awk '{for(i=1;i<=NF;i++) s+=$i} END{print s}' fisier
+
+EX 4) Afiseaza numele utilizatorilor (camp 1) cu UID (camp 3) > 1000, separator ':':
+    awk -F: '$3>1000{print $1}' /etc/passwd
+
+EX 5) Numara de cate ori apare fiecare cuvant intr-un fisier (frecventa cuvintelor):
+    awk '{for(i=1;i<=NF;i++) freq[$i]++} END{for(w in freq) print w, freq[w]}' fisier
+
+EX 6) Afiseaza liniile cu mai mult de 5 campuri, impreuna cu numarul liniei:
+    awk 'NF>5{print NR": "$0}' fisier
+
+
+################################################################################
+PARTEA 5: BASH / SHELL SCRIPTING
+################################################################################
+
+--------------------------------------------------------------------------------
+5.1 CONTROLUL EXECUTIEI INTRE PROGRAME
+--------------------------------------------------------------------------------
+A && B     B se executa DOAR daca A a reusit (exit code 0)
+A || B     B se executa DOAR daca A a esuat (exit code != 0)
+A ; B      B se executa INDIFERENT de rezultatul lui A (secvential)
+A & B      A ruleaza in BACKGROUND, B porneste imediat
+( A ; B )  subshell - se executa intr-un proces shell nou
+
+EX) Programul B se executa doar daca A a reusit:
+    A && B
+
+EX) Programul C se executa doar daca A SI B au esuat (cod de eroare):
+    A ; B ; { [ $? -ne 0 ] ...  }  -- varianta corecta si simpla:
+    A || true ; B || C            -- nu e corect logic
+    RASPUNS CORECT: 
+    A; if [ $? -ne 0 ]; then B; if [ $? -ne 0 ]; then C; fi; fi
+    -- sau folosind direct exit code-urile fara variabila intermediara:
+    ! A && ! B && C
+    (! A negeaza exit code-ul lui A: daca A esueaza, !A are succes; && inlantuie conditiile)
+
+--------------------------------------------------------------------------------
+5.2 REDIRECTARI
+--------------------------------------------------------------------------------
+>       redirectare stdout, SUPRASCRIE fisierul
+>>      redirectare stdout, ADAUGA la finalul fisierului
+<       redirectare stdin (citeste din fisier)
+2>      redirectare stderr
+2>&1    redirecteaza stderr catre acelasi loc ca stdout
+&>      redirecteaza AMBELE (stdout si stderr) - bash extension
+|       pipe - trimite stdout-ul unui proces la stdin-ul urmatorului
+
+EX) Redirectionare stdout catre output.txt, suprascriere:
+    ./program > output.txt
+    (in cod C echivalent: freopen("output.txt","w",stdout); sau close(1); open("output.txt",...))
+
+EX) Redirectare stderr printr-un pipe catre alt program:
+    programA 2>&1 1>/dev/null | programB
+    -- sau simplu: programA 2>&1 >/dev/null | programB
+    Explicatie: intai 2>&1 face ca stderr sa mearga unde merge stdout (adica in pipe by default),
+    apoi 1>/dev/null redirectioneaza stdout-ul normal in /dev/null, astfel doar stderr ajunge la
+    programB prin pipe.
+
+--------------------------------------------------------------------------------
+5.3 TESTE (folosite in if / [ ] / [[ ]])
+--------------------------------------------------------------------------------
+-e fisier    exista
+-f fisier    e fisier obisnuit (regular file)
+-d fisier    e director
+-r/-w/-x     e citibil/scriibil/executabil (verifica permisiuni pt userul curent)
+-s fisier    exista si NU e gol (size > 0)
+-L fisier    e link simbolic
+-nt / -ot    newer than / older than (comparare timp modificare)
+= != -eq -ne -lt -gt -le -ge     comparatii (stringuri: = != ; numere: -eq -ne -lt -gt -le -ge)
+-a / -o      AND / OR in interiorul [ ] (in [[ ]] se folosesc && ||)
+
+EX) Verifica daca un fisier exista SI utilizatorul curent are ORICE permisiune pe el:
+    if [ -e "$f" ] && [ -r "$f" -o -w "$f" -o -x "$f" ]; then
+        echo "exista si are permisiuni"
+    fi
+
+--------------------------------------------------------------------------------
+5.4 BUCLE SI PARAMETRI
+--------------------------------------------------------------------------------
+$0 $1 $2 ..     numele scriptului, argumentele 1, 2, ...
+$#              numarul de argumente
+$@ / $*         toate argumentele (ca lista / ca un singur string)
+shift           muta toti parametrii cu o pozitie la stanga ($2 devine $1, etc.)
+
+EX) Afiseaza toate argumentele fara FOR:
+    #!/bin/bash
+    while [ $# -gt 0 ]; do
+        echo "$1"
+        shift
+    done
+    -- sau recursiv, sau cu: echo "$@" | tr ' ' '\n'
+
+--------------------------------------------------------------------------------
+5.5 EXEMPLE REZOLVATE SCRIPTURI SHELL
+--------------------------------------------------------------------------------
+
+EX 1) Citeste din a.txt perechi de nume de fisiere; sterge al doilea daca primul exista deja:
+    #!/bin/bash
+    while read f1 f2; do
+        if [ -e "$f1" ]; then
+            rm -f "$f2"
+        fi
+    done < a.txt
+
+EX 2) a.txt are 3 fisiere pe linie; concateneaza primele doua in al treilea,
+      doar daca al treilea NU e unul dintre primele doua:
+    #!/bin/bash
+    while read f1 f2 f3; do
+        if [ "$f3" != "$f1" ] && [ "$f3" != "$f2" ]; then
+            cat "$f1" "$f2" > "$f3"
+        fi
+    done < a.txt
+
+EX 3) Media numarului de linii de cod (fara comentarii, linii goale, linii doar 
+      cu spatii/tab) pt toate fisierele .sh din directorul curent:
+    #!/bin/bash
+    total=0
+    count=0
+    for f in *.sh; do
+        [ -e "$f" ] || continue
+        n=$(grep -vE '^[[:space:]]*($|#)' "$f" | wc -l)
+        total=$((total+n))
+        count=$((count+1))
+    done
+    if [ $count -gt 0 ]; then
+        echo "scale=2; $total/$count" | bc
+    fi
+
+EX 4) Afiseaza toate subdirectoarele (recursiv) care contin fisiere .c:
+    find . -type d -exec sh -c 'ls "{}" | grep -q "\.c$"' \; -print
+    -- varianta mai simpla:
+    find . -name "*.c" -exec dirname {} \; | sort -u
+
+EX 5) Afiseaza lista de ID-uri unice (ex: amin234, mair5678) dintr-un fisier:
+    grep -oE '[a-zA-Z]+[0-9]+' a.txt | sort -u
+
+EX 6) Inverseaza toate perechile de cifre vecine (a3972b -> a9327b):
+    Se citeste caracter cu caracter si se interschimba cifrele 2 cate 2 pastrand literele.
+    Solutie folosind sed pe grupuri de cifre consecutive:
+    sed -E ':a; s/([0-9])([0-9])/\2\1/2; ta' 
+    -- (aplica repetat interschimbarea perechii a 2-a de cifre gasite, complex; 
+        in practica se accepta si o solutie awk char-by-char):
+    awk '{
+        n=length($0); out="";
+        for(i=1;i<=n;i++){
+            c=substr($0,i,1)
+            if(c ~ /[0-9]/ && i<n && substr($0,i+1,1) ~ /[0-9]/){
+                out = out substr($0,i+1,1) c
+                i++
+            } else out = out c
+        }
+        print out
+    }' a.txt
+
+EX 7) Afiseaza suma a doua numere pe fiecare linie (linia contine 2 numere separate prin spatiu):
+    awk '{print $1+$2}' a.txt
+
+EX 8) Afiseaza liniile cu cuvinte care incep cu litera mare din a.txt:
+    grep -E '(^|[[:space:]])[A-Z][a-z]*' a.txt
+
+
+################################################################################
+PARTEA 6: PROCESE (fork / wait / exec / exit)
+################################################################################
+
+--------------------------------------------------------------------------------
+6.1 FUNCTII IMPORTANTE
+--------------------------------------------------------------------------------
+pid_t fork(void)
+    - creeaza un proces COPIL, imagine identica a parintelui (copie a spatiului de adrese,
+      dar SEPARATA - copy-on-write in practica)
+    - returneaza:
+        0            -> in procesul COPIL
+        PID copil     -> in procesul PARINTE
+        -1            -> eroare, nu s-a creat copil
+    - dupa fork, ambele procese continua executia DE LA INSTRUCTIUNEA URMATOARE fork()
+
+int wait(int *status) / waitpid(pid_t pid, int *status, int options)
+    - parintele asteapta terminarea UNUI COPIL (oricare la wait, sau unul specific la waitpid)
+    - returneaza PID-ul copilului terminat, sau -1 daca nu (mai) exista copii
+    - fara wait, copilul terminat devine ZOMBIE pana parintele face wait/moare
+
+void exit(int status) / _exit(int status)
+    - termina procesul curent, status = codul de iesire (0 = succes, altfel = eroare)
+    - exit() face si curatenie (flush buffere, atexit handlers); _exit() nu
+
+int execl/execlp/execv/execvp/execle/execve(...)
+    - INLOCUIESTE imaginea procesului curent cu un program nou (acelasi PID!)
+    - daca succes, NU se mai intoarce (codul de dupa exec nu se executa)
+    - daca esueaza, returneaza -1 si continua executia normal
+    - "l" = argumente ca LISTA (execl("/bin/ls","ls","-l",NULL))
+    - "v" = argumente ca VECTOR (execv("/bin/ls", argv))
+    - "p" = cauta programul in PATH (nu trebuie calea completa)
+    - "e" = primeste explicit environment-ul (envp)
+
+--------------------------------------------------------------------------------
+6.2 EXEMPLE REZOLVATE PROCESE
+--------------------------------------------------------------------------------
+
+EX 1) Cate procese fiu creeaza programul, considerand fork() reusit:
+    int main() {
+        while(wait(NULL) > 0)
+            if(fork() == 0) {
+                exit(0);
+            }
+        return 0;
+    }
+    REZOLVARE:
+    - La inceput, procesul parinte NU are niciun copil, deci wait(NULL) returneaza IMEDIAT -1
+      (nu exista niciun proces copil de asteptat) -> conditia while(wait(NULL) > 0) e FALSA
+      de la prima iteratie.
+    - Bucla while NU se executa niciodata, deci fork() nu se apeleaza deloc.
+    RASPUNS: 0 (zero) procese fiu sunt create.
+
+EX 2) Cate procese va crea programul (excluzand parintele), fork() reusit:
+    fork(); wait(0); fork(); wait(0); fork();
+    REZOLVARE (se face arbore, fiecare fork() dubleaza numarul de procese care il executa,
+    dar wait() nu opreste crearea de procese, doar sincronizeaza):
+    - dupa primul fork(): 2 procese (P, C1)
+    - fiecare din cele 2 executa wait(0) (parintele asteapta copilul daca are, copilul nu are
+      copii deci wait returneaza -1 imediat pt copii fara descendenti proprii)
+    - fiecare din cele 2 procese executa al doilea fork(): 2 -> 4 procese
+    - fiecare din cele 4 face wait(0)
+    - fiecare din cele 4 executa al treilea fork(): 4 -> 8 procese
+    - Total procese dupa executie completa: 8
+    - Excluzand parintele initial: 8 - 1 = 7 procese noi create
+
+EX 3) Numarul maxim de procese fiu care coexista simultan:
+    for (i = 0; i < 7; i++){
+        if (fork() == 0){ sleep(rand()%10); exit(0); }
+        if (i % 3 == 0) wait(0);
+    }
+    REZOLVARE: parintele creeaza 7 copii, dar la i=0,3,6 asteapta un copil dupa ce il creeaza
+    (deci acel copil moare imediat, practic nu se acumuleaza). La i=1,2,4,5 copiii NU sunt
+    asteptati imediat, deci raman "vii" (dorm random) pana parintele termina bucla.
+    - i=0: creeaza C0, apoi wait -> C0 se termina inainte sa continue (0%3==0)
+    - i=1: creeaza C1 (nu asteapta)
+    - i=2: creeaza C2 (nu asteapta)
+    - i=3: creeaza C3, apoi wait (asteapta UNUL dintre copiii ramasi - C1,C2 sau C3, nu neaparat C3!)
+    - i=4: creeaza C4 (nu asteapta)
+    - i=5: creeaza C5 (nu asteapta)
+    - i=6: creeaza C6, apoi wait (asteapta unul din cei ramasi)
+    In cel mai defavorabil caz (wait-urile prind mereu copilul cel mai proaspat, nu pe cel vechi),
+    numarul de copii vii simultan poate ajunge pana la 5 (C1,C2 nedormiti + C4,C5 + inca unul
+    care nu a fost prins de wait). RASPUNS UZUAL ACCEPTAT: maxim 5 procese fiu coexista simultan
+    (se justifica prin faptul ca doar 2 din cele 7 apeluri wait() garanteaza eliminarea unui copil,
+    deci in cel mai rau caz raman 7-2=5 vii in acelasi timp).
+
+EX 4) execl care executa programul si argumentele date lui ./a (ex: ./a ls -l /etc/passwd):
+    int main(int argc, char** argv) {
+        execvp(argv[1], &argv[1]);
+    }
+    Explicatie: argv[1] = numele programului ("ls"), &argv[1] = adresa unde incepe subvectorul
+    argv[1..n] care e deja terminat cu NULL (mostenit din argv original) -> execvp il foloseste
+    direct ca noul argv.
+
+EX 5) execv care executa: gcc -Wall -Wextra -Werror -g -o a a.c (gcc in /usr/bin):
+    char *args[] = {"gcc","-Wall","-Wextra","-Werror","-g","-o","a","a.c", NULL};
+    execv("/usr/bin/gcc", args);
+
+EX 6) Adauga cod C ca fisierul b.txt sa fie suprascris cu continutul lui a.txt:
+    execlp("cat", "cat", "a.txt", NULL);
+    REZOLVARE: trebuie redirectat stdout INAINTE de exec catre b.txt:
+    int fd = open("b.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    dup2(fd, STDOUT_FILENO);
+    close(fd);
+    execlp("cat", "cat", "a.txt", NULL);
+
+EX 7) Ce va afisa codul:
+    printf("A\n"); execl(.....); printf("B\n");
+    RASPUNS: 
+    - "A" se afiseaza mereu (printf inainte de exec se executa normal), CU CONDITIA sa fie
+      deja flush-uit (stdout e de obicei line-buffered la terminal, deci "A\n" se afiseaza imediat)
+    - Daca execl REUSESTE: procesul e inlocuit cu noul program, "B" NU se mai afiseaza niciodata
+      (codul de dupa exec e pierdut)
+    - Daca execl ESUEAZA: executia continua normal, deci "B" SE AFISEAZA
+
+EX 8) Hard link vs symbolic link:
+    Hard link: 
+    - doi (sau mai multi) intrari de director care pointeaza catre ACELASI i-node
+    - fisierul e sters efectiv doar cand link count-ul i-node-ului ajunge la 0
+    - NU poate fi facut catre un director (de obicei) si NU poate trece intre PARTITII diferite
+      (i-node-urile sunt specifice unui filesystem/partitie)
+    Symbolic link (soft link):
+    - un fisier SEPARAT care contine CALEA catre alt fisier (i-node diferit)
+    - poate trece intre partitii diferite si poate puncta catre directoare
+    - daca fisierul tinta e sters, linkul simbolic ramane dar devine "broken" (dangling)
+
+EX 9) Poti crea hard link catre un fisier de pe alta partitie?
+    NU. Hard link-urile functioneaza prin numarul de i-node, iar i-node-urile sunt unice doar
+    in cadrul aceluiasi filesystem/partitie. Pentru fisiere pe partitii diferite se foloseste
+    obligatoriu un symbolic link.
+
+
+################################################################################
+PARTEA 7: PIPE SI FIFO
+################################################################################
+
+--------------------------------------------------------------------------------
+7.1 PIPE (fara nume, intre procese inrudite)
+--------------------------------------------------------------------------------
+int pipe(int fd[2]);
+    - fd[0] = capatul de CITIRE
+    - fd[1] = capatul de SCRIERE
+    - se foloseste de obicei impreuna cu fork(): un proces inchide capatul care nu-l foloseste
+
+FILE *popen(const char *command, const char *mode);
+    - deschide un pipe catre/dinspre o comanda shell, mode = "r" (citire din output-ul comenzii)
+      sau "w" (scriere catre input-ul comenzii)
+    - trebuie inchis cu pclose(), NU cu fclose() (pclose asteapta terminarea procesului copil
+      si returneaza exit status-ul lui; fclose doar inchide stream-ul, fara sa astepte procesul,
+      ceea ce ar lasa un proces zombie sau ar corupe gestiunea proceselor)
+
+int dup(int oldfd) / dup2(int oldfd, int newfd)
+    - duplica un descriptor de fisier; dup2 forteaza newfd sa devina o copie a oldfd
+    - folosit tipic pentru REDIRECTARE (ex: dup2(fd, STDOUT_FILENO))
+
+--------------------------------------------------------------------------------
+7.2 FIFO (pipe cu nume, intre procese neinrudite)
+--------------------------------------------------------------------------------
+int mkfifo(const char *path, mode_t mode);
+    - creeaza un fisier special de tip FIFO pe disc (fisierul exista in filesystem, dar 
+      continutul e doar in memorie/kernel, nu se scrie pe disc efectiv)
+    - dupa creare, se deschide cu open() ca orice fisier normal (O_RDONLY sau O_WRONLY)
+
+--------------------------------------------------------------------------------
+7.3 COMPORTAMENT PIPE/FIFO
+--------------------------------------------------------------------------------
+- read() dintr-un pipe/FIFO GOL, cu capatul de scriere INCA deschis -> se BLOCHEAZA pana
+  vine ceva de citit
+- read() dintr-un pipe/FIFO GOL, cu capatul de scriere INCHIS (toate) -> returneaza 0 (EOF)
+- read() dintr-un pipe cu MAI PUTINE date decat cerute, dar NEGOL -> returneaza CE ARE 
+  DISPONIBIL (nu asteapta sa se umple bufferul cerut), fara sa se blocheze
+- write() intr-un pipe PLIN, cu capatul de citire INCA deschis -> se BLOCHEAZA pana se 
+  elibereaza spatiu
+- write() intr-un pipe PLIN (sau nu) al carui capat de CITIRE a fost inchis de toate procesele
+  -> procesul primeste semnalul SIGPIPE (care implicit termina procesul), iar daca semnalul
+  e ignorat/blocat, write() returneaza -1 cu errno = EPIPE
+- write() intr-un FIFO deschis pt scriere, FARA niciun cititor -> open() in sine NU se blocheaza
+  daca a fost deschis O_WRONLY fara O_NONBLOCK... DE FAPT: open() pt scriere a unui FIFO SE
+  BLOCHEAZA pana exista cel putin un cititor care sa il fi deschis (exceptie: O_NONBLOCK,
+  caz in care open() esueaza cu ENXIO daca nu exista cititor). Daca s-a ajuns la write():
+  scrierea ar continua normal daca exista un cititor conectat; daca NU exista niciun proces
+  care a deschis capatul de citire, write() va primi SIGPIPE/EPIPE (identic cu pipe normal).
+
+EX) Un proces deschide FIFO pt scriere si scrie 100 octeti imediat, fara niciun cititor:
+    RASPUNS: open() in modul O_WRONLY (fara O_NONBLOCK) se BLOCHEAZA in acest caz PANA
+    cand un alt proces deschide acelasi FIFO pentru citire (deci write() nici nu ajunge sa
+    fie apelat pana atunci). Daca s-ar folosi O_NONBLOCK, open() ar esua imediat cu ENXIO.
+
+EX) Cate FIFO poate deschide un proces daca sunt/vor fi folosite de altii DOAR pentru scriere:
+    Procesul respectiv le poate deschide pentru CITIRE oricate (nu exista o limita speciala
+    legata de FIFO in sine, doar limita generala de descriptori de fisier ai procesului/sistemului
+    - de obicei configurata prin ulimit, ex: 1024).
+
+EX) De ce nu e recomandat sa comunici bidirectional printr-un singur FIFO:
+    Daca ambele procese scriu SI citesc din acelasi FIFO, mesajele proprii pot fi citite 
+    inapoi de expeditor (nu exista separare intre "mesajele mele" si "raspunsurile celuilalt"),
+    iar ordinea/continutul se pot amesteca imprevizibil. Solutia corecta e sa se foloseasca
+    DOUA FIFO-uri, cate unul pentru fiecare directie de comunicare.
+
+EX) Trimite "Hello\nWorld\n" catre "grep -E o" folosind popen in scriere:
+    FILE *p = popen("grep -E o", "w");
+    fprintf(p, "Hello\nWorld\n");
+    pclose(p);
+
+EX) Descrie cum poti folosi un pipe pe post de semafor pt sincronizarea a 2 procese:
+    Se creeaza un pipe. Procesul care trebuie sa "astepte un semnal" face un read() blocant
+    de 1 octet din capatul de citire. Procesul care trebuie sa "dea semnalul" face write()
+    de 1 octet in capatul de scriere, in momentul in care conditia e indeplinita. read()-ul
+    blocat se deblocheaza imediat ce sosesc date -> efect echivalent cu sem_post()/sem_wait().
+    (Se pot pune mai multi octeti in pipe pt a simula un semafor cu valoare > 1, similar
+    cu un semafor numarabil, fiecare octet scris = un "V", fiecare octet citit = un "P".)
+
+
+################################################################################
+PARTEA 8: THREADURI (PTHREAD) - MUTEX, RWLOCK, CONDITION VAR, BARRIER, SEMAFOR
+################################################################################
+
+--------------------------------------------------------------------------------
+8.1 CREARE / ASTEPTARE THREAD
+--------------------------------------------------------------------------------
+int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+                    void *(*start_routine)(void*), void *arg);
+    - creeaza un thread nou care executa start_routine(arg)
+
+int pthread_join(pthread_t thread, void **retval);
+    - asteapta terminarea thread-ului specificat, similar cu wait() la procese
+    - retval primeste valoarea de return a functiei thread-ului
+
+--------------------------------------------------------------------------------
+8.2 MUTEX (exclusivitate mutuala)
+--------------------------------------------------------------------------------
+pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;    // sau pthread_mutex_init(&m, NULL);
+pthread_mutex_lock(&m);      // blocheaza daca e deja luat de alt thread, altfel il ia
+pthread_mutex_unlock(&m);    // elibereaza mutexul
+pthread_mutex_trylock(&m);   // incearca sa il ia, NU se blocheaza, returneaza eroare daca ocupat
+pthread_mutex_destroy(&m);
+
+Sectiunea critica = portiunea de cod care acceseaza o resursa comuna si trebuie protejata
+astfel incat un singur thread sa o execute la un moment dat.
+
+EX) Protejeaza sectiunea critica (n++):
+    int n = 0;
+    pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+    void* f(void* v){
+        pthread_mutex_lock(&m);
+        if(n < 500) { n++; }
+        pthread_mutex_unlock(&m);
+        return NULL;
+    }
+
+EX) 10 threaduri executa f simultan, n trebuie sa fie 10 la final:
+    int n = 0;
+    pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+    void* f(void* p) {
+        pthread_mutex_lock(&m);
+        n++;
+        pthread_mutex_unlock(&m);
+        return NULL;
+    }
+    Explicatie: fara mutex, n++ NU e atomic (presupune read-modify-write pe 3 pasi la nivel
+    de masina), deci 2 threaduri pot citi aceeasi valoare veche si scrie inapoi aceeasi
+    valoare noua, pierzand o incrementare (race condition / lost update).
+
+--------------------------------------------------------------------------------
+8.3 DEADLOCK - prevenire (mutexi multipli)
+--------------------------------------------------------------------------------
+Cauza clasica: 2 threaduri, fiecare tine un mutex si asteapta mutexul celuilalt (deadlock
+circular / "deadly embrace"). Exemplu tipic (m[0], m[1], threaduri cu id diferit fac lock
+in ordine diferita: thread 0 face lock(m[0]) apoi lock(m[1]); thread 1 face lock(m[1])
+apoi lock(m[0]) -> pot ajunge in situatia in care fiecare tine unul si asteapta pe celalalt.
+
+CE POATE FACE PROGRAMATORUL:
+- Impune o ORDINE TOTALA/GLOBALA de blocare a mutexilor (toate threadurile fac lock 
+  intotdeauna in aceeasi ordine, ex: mereu mutexul cu id mai mic primul) -> elimina 
+  asteptarea circulara (una din cele 4 conditii Coffman pt deadlock)
+- Foloseste pthread_mutex_trylock in loc de lock, si daca nu poate obtine al doilea mutex,
+  elibereaza-l pe primul si reincearca mai tarziu (evita "hold and wait")
+- Foloseste un singur mutex "mare" (coarse-grained locking) daca performanta nu e critica
+- Foloseste timeout-uri (pthread_mutex_timedlock)
+
+--------------------------------------------------------------------------------
+8.4 RWLOCK (read-write lock)
+--------------------------------------------------------------------------------
+pthread_rwlock_t rw = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_rdlock(&rw);   // lock de CITIRE: mai multi cititori simultan sunt permisi
+pthread_rwlock_wrlock(&rw);   // lock de SCRIERE: exclusiv, niciun alt cititor/scriitor
+pthread_rwlock_unlock(&rw);
+
+DIFERENTA fata de mutex: mutexul e mereu exclusiv (1 thread deodata, indiferent de operatie).
+rwlock permite ORICATI cititori simultan, dar scrierea ramane exclusiva.
+
+EX) Ce se intampla daca inlocuim TOATE mutex_lock cu rwlock_wrlock (peste tot)?
+    Comportamentul e IDENTIC cu mutexul clasic: rwlock_wrlock e tot exclusiv (un singur
+    thread la un moment dat, la fel ca mutex_lock), deci programul functioneaza LA FEL,
+    doar ca pierde beneficiul de paralelism al cititorilor multipli (nu se foloseste
+    niciodata rdlock, deci rwlock e folosit doar in modul exclusiv - echivalent cu mutex,
+    dar cu overhead putin mai mare).
+
+EX) Ce se intampla daca inlocuim mutex_lock cu rwlock_rdlock (peste tot)?
+    NU mai exista exclusivitate mutuala: mai multe threaduri pot intra simultan in
+    "sectiunea critica" (toate fac doar rdlock), deci apar RACE CONDITIONS - rezultatul
+    devine incorect/nedeterminist daca sectiunea modifica date comune (scriere concurenta
+    fara protectie reala).
+
+--------------------------------------------------------------------------------
+8.5 CONDITION VARIABLE
+--------------------------------------------------------------------------------
+pthread_cond_t c = PTHREAD_COND_INITIALIZER;
+pthread_cond_wait(&c, &m);     // ATENTIE: elibereaza ATOMIC mutexul m si adoarme threadul;
+                                // la trezire, RE-OBTINE automat mutexul m inainte de a reveni
+pthread_cond_signal(&c);       // trezeste UN thread care astepta pe c
+pthread_cond_broadcast(&c);    // trezeste TOATE threadurile care asteapta pe c
+
+EX) Ce face pthread_cond_wait cu mutexul primit ca argument?
+    Il ELIBEREAZA in mod ATOMIC in momentul in care threadul incepe sa astepte (astfel incat
+    niciun alt thread sa nu "piarda" un signal intre unlock si wait), iar cand threadul e
+    trezit (prin signal/broadcast), pthread_cond_wait RE-BLOCHEAZA (re-obtine) automat
+    acelasi mutex INAINTE de a reveni din functie, astfel incat codul de dupa wait sa
+    ruleze tot in interiorul sectiunii critice protejate de mutex.
+
+EX) De ce trebuie re-verificata conditia dupa ce pthread_cond_wait revine (while, nu if)?
+    Din cauza "spurious wakeups" (treziri false, permise de standard fara motiv real) si
+    pentru ca intre momentul in care threadul e trezit si momentul in care reobtine mutexul,
+    ALT thread ar fi putut sa "fure" resursa si sa modifice conditia inapoi la fals. De aceea
+    se foloseste intotdeauna:
+        pthread_mutex_lock(&m);
+        while(!conditie) pthread_cond_wait(&c, &m);
+        ... // sectiune critica, conditie garantat adevarata aici
+        pthread_mutex_unlock(&m);
+
+--------------------------------------------------------------------------------
+8.6 BARRIER
+--------------------------------------------------------------------------------
+pthread_barrier_t b;
+pthread_barrier_init(&b, NULL, N);   // N = numarul de threaduri care trebuie sa ajunga
+pthread_barrier_wait(&b);            // se blocheaza pana ajung TOATE cele N threaduri
+pthread_barrier_destroy(&b);
+
+- Cand al N-lea thread apeleaza wait, TOATE cele N threaduri sunt deblocate simultan.
+- Efectul apelarii pe o bariera initializata cu N=1: bariera se "deschide" IMEDIAT la primul
+  (si singurul necesar) apel -> practic nu blocheaza deloc threadul (echivalent cu no-op).
+
+EX) Valori T, N1, N2, N3 (distincte, >0) pt care programul cu 3 bariere se termina corect:
+    (T threaduri creeaza cate un thread pt fiecare din f1,f2,f3, deci sunt T threaduri
+    care apeleaza barrier_wait pe b1, T pe b2, T pe b3)
+    Pentru ca programul sa se termine, FIECARE bariera trebuie sa fie "deschisa" de EXACT
+    atatea threaduri cate s-au inregistrat sa o astepte, adica N_i trebuie sa fie egal cu T
+    (numarul de threaduri care de fapt apeleaza acea bariera). Deoarece se cere N1,N2,N3
+    DISTINCTE intre ele (dar programul are acelasi T pentru toate!), enuntul de fapt permite
+    valori diferite ale N doar daca sunt gandite per numarul de threaduri care ajung la
+    bariera respectiva - insa in acest program, EXACT T threaduri ajung la fiecare bariera.
+    RASPUNS: NU exista solutie in care N1, N2, N3 sa fie distincte SI programul sa se termine
+    corect, DECAT daca se alege un T diferit pentru fiecare... dar T e unic in program.
+    De aceea, raspunsul standard acceptat este: T = N1 = N2 = N3 NU pot fi toate distincte,
+    deci se alege o valoare gresita a enuntului OR intelegerea corecta e ca doar T conteaza:
+    exemplu VALID (desi N1,N2,N3 nu pot fi distincte pt terminare garantata): 
+    T=2, N1=2, N2=2, N3=2 -> se termina corect.
+    (Daca enuntul chiar cere N1 != N2 != N3, programul NU se poate termina garantat pt orice
+    interschimbare a executiei threadurilor - discutati asta explicit la examen daca apare
+    aceasta intrebare, mentionand ca solutia doar cu T=N1=N2=N3 garanteaza terminarea.)
+
+--------------------------------------------------------------------------------
+8.7 SEMAFOARE (POSIX)
+--------------------------------------------------------------------------------
+sem_t s;
+sem_init(&s, pshared, value);    // pshared=0 (thread-uri), value = valoare initiala
+sem_wait(&s);      // P() - decrementeaza; daca s==0, se BLOCHEAZA
+sem_post(&s);      // V() - incrementeaza si trezeste un thread care astepta (daca exista)
+sem_trywait(&s);   // varianta neblocanta
+sem_destroy(&s);
+
+EX) Cum incrementezi valoarea unui semafor POSIX?
+    Prin apelul sem_post(&s) - aceasta e SINGURA operatie standard care creste valoarea
+    (nu exista acces direct la camp, e opac).
+
+EX) Ce e un semafor binar si ce face P() cand e apelat de mai multe procese/threaduri?
+    Semafor binar = semafor cu valori posibile DOAR 0 sau 1 (echivalent functional cu un
+    mutex). Cand mai multe threaduri apeleaza P() (sem_wait) simultan pe un semafor cu
+    valoare 1: UNUL SINGUR va reusi sa il decrementeze la 0 si va continua executia; TOATE
+    celelalte se vor BLOCA (vor astepta in coada) pana cand un V() (sem_post) creste din 
+    nou valoarea la 1, moment in care UNUL dintre cele care asteptau (nedeterminist care)
+    va fi deblocat.
+
+EX) Asigura-te ca maximum 3 persoane voteaza simultan (din 100 threaduri):
+    sem_t sem;
+    void* person(void* args){
+        sem_wait(&sem);
+        printf("voting ...\n");
+        sem_post(&sem);
+        return NULL;
+    }
+    int main(){
+        pthread_t t[100];
+        sem_init(&sem, 0, 3);     // valoare initiala 3 -> maxim 3 threaduri trec simultan
+        for(int i=0;i<100;i++) pthread_create(&t[i], NULL, person, NULL);
+        for(int i=0;i<100;i++) pthread_join(t[i], NULL);
+        sem_destroy(&sem);
+        return 0;
+    }
+
+EX) Producer-consumer cu buffer de capacitate N - cate semafoare si ce valori initiale:
+    3 semafoare:
+    - sem_t empty; sem_init(&empty, 0, N);   // numara sloturile LIBERE, initial N
+    - sem_t full;  sem_init(&full, 0, 0);    // numara elementele DISPONIBILE, initial 0
+    - sem_t mutex; sem_init(&mutex, 0, 1);   // exclusivitate la accesul in bufferul comun
+    Producer: sem_wait(&empty); sem_wait(&mutex); [pune element]; sem_post(&mutex); sem_post(&full);
+    Consumer: sem_wait(&full); sem_wait(&mutex); [scoate element]; sem_post(&mutex); sem_post(&empty);
+
+--------------------------------------------------------------------------------
+8.8 3 apeluri de functii care asigura exclusivitate mutuala
+--------------------------------------------------------------------------------
+1) pthread_mutex_lock / pthread_mutex_unlock
+2) sem_wait / sem_post (pe un semafor binar, initializat cu 1)
+3) pthread_rwlock_wrlock / pthread_rwlock_unlock (folosit exclusiv, doar in modul scriere)
+
+
+################################################################################
+PARTEA 9: TEORIE - INTREBARI FRECVENTE CU RASPUNS
+################################################################################
+
+Q: Diferenta dintre SJF si STCF?
+A: SJF (Shortest Job First) e NON-preemptiv: odata inceput un job, ruleaza pana la final
+   fara intrerupere, alegerea facandu-se doar la momentul in care CPU devine liber.
+   STCF (Shortest Time-to-Completion First) e varianta PREEMPTIVA a SJF: daca soseste un
+   job nou cu timp de executie ramas mai mic decat timpul RAMAS al jobului curent, planificatorul
+   intrerupe jobul curent si trece la cel nou. STCF minimizeaza mai bine timpul mediu de asteptare
+   cand joburile sosesc la momente diferite.
+
+Q: Worst Fit cu lista 32, 44, 98 si doua malloc(33)?
+A: Worst Fit alege mereu cea MAI MARE zona libera disponibila.
+   - malloc(33) #1: cea mai mare zona e 98 -> se aloca 33 din 98, ramane 98-33=65
+     Lista devine: 32, 44, 65
+   - malloc(33) #2: cea mai mare zona e acum 65 -> se aloca 33 din 65, ramane 65-33=32
+     Lista devine: 32, 44, 32
+   RASPUNS FINAL: 32, 44, 32
+
+Q: Cand se schimba starea unui proces din RUN in READY?
+A: Cand planificatorul (scheduler) ii retrage CPU-ul desi procesul e in continuare gata sa
+   ruleze (nu e blocat) - de obicei la expirarea cuantei de timp (time slice / preemptie),
+   sau la aparitia unui proces cu prioritate mai mare.
+
+Q: De ce sunt problematice procesele zombie?
+A: Un proces zombie a terminat executia dar ii mai ramane in tabela de procese intrarea
+   (PID, exit status) pana parintele face wait()/waitpid(). Desi nu consuma CPU/memorie
+   semnificativa, ocupa un slot din tabela de procese (finita ca dimensiune); daca se
+   acumuleaza foarte multe zombie neasteptate, se pot epuiza PID-urile disponibile.
+
+Q: Cand ai prefera un proces in locul unui thread?
+A: Cand ai nevoie de IZOLARE completa (spatiu de adrese separat) pentru securitate/robustete
+   (o eroare/crash intr-un proces nu afecteaza altele), sau cand vrei sa rulezi cod care nu
+   are incredere deplina, sau ai nevoie sa folosesti exec pentru a rula un program diferit.
+   Threadurile sunt preferate cand ai nevoie de comunicare/schimb de date FRECVENT si RAPID
+   (memorie comuna, fara IPC) si overhead mic de creare/context-switch.
+
+Q: Principiul localitatii referitor la incarcarea paginilor?
+A: Programele tind sa acceseze un set RESTRANS de adrese de memorie intr-un interval scurt
+   de timp: localitate TEMPORALA (o adresa accesata recent va fi probabil accesata din nou
+   curand) si localitate SPATIALA (adresele apropiate de una accesata recent vor fi probabil
+   accesate curand). Aceasta permite folosirea eficienta a paginarii/cache-urilor: se incarca
+   pagini intregi (nu octeti individuali), presupunand ca vecinii vor fi folositi curand.
+
+Q: Ce pagina alege NRU ca victima cu prioritate maxima?
+A: NRU (Not Recently Used) clasifica paginile in 4 clase dupa bitii referenced(R)/modified(M):
+   clasa 0 = R=0,M=0 (nefolosita, necurata) - PRIORITATE MAXIMA pt inlocuire
+   clasa 1 = R=0,M=1 ; clasa 2 = R=1,M=0 ; clasa 3 = R=1,M=1 (cea mai putin prioritara)
+   Se alege o pagina din cea mai mica clasa nevida gasita (clasa 0 preferata daca exista).
+
+Q: Continutul superblock-ului pe un disc Linux?
+A: Superblock-ul contine metadate despre intreg filesystemul: dimensiunea totala, dimensiunea
+   blocului, numarul total si numarul liber de i-noduri, numarul total si liber de blocuri de
+   date, tipul de filesystem, informatii de montare, pointeri catre structurile de gestiune
+   a spatiului liber (bitmap-uri de i-noduri/blocuri), etc.
+
+Q: Ce se intampla cu datele cand stergi un fisier care are un hard link catre el?
+A: Datele NU se sterg de pe disc - i-node-ul si blocurile de date raman valide atat timp cat
+   link count-ul (numarul de nume/hard link-uri catre acel i-node) e mai mare decat 0. Se
+   sterge doar intrarea de director respectiva; fisierul ramane accesibil prin celelalte
+   hard link-uri.
+
+Q: Formula pt dimensiunea maxima a unui fisier (D directi, 1 indirect simplu, 
+   1 dublu indirect, 1 triplu indirect, bloc = B octeti, adresa = A octeti):
+A: Dimensiune_max = B * ( D + (B/A) + (B/A)^2 + (B/A)^3 )
+   Explicatie: D blocuri adresate direct; indirectarea simpla adreseaza B/A blocuri;
+   indirectarea dubla adreseaza (B/A)^2 blocuri; cea tripla (B/A)^3 blocuri; totul inmultit
+   cu B (dimensiunea unui bloc) pt a obtine dimensiunea in octeti.
+
+Q: Cate blocuri de date adreseaza indirectarea dubla / tripla a unui i-node
+   (bloc=B, adresa=A)?
+A: Indirectare dubla: (B/A)^2 blocuri de date
+   Indirectare tripla: (B/A)^3 blocuri de date
+   (un bloc indirect contine B/A adrese; fiecare din acestea puncteaza la un alt bloc indirect
+   care contine tot B/A adrese, etc.)
+
+Q: Avantaj/dezavantaj First Fit vs Worst Fit?
+A: First Fit: avantaj = rapid (se opreste la prima zona suficient de mare, cautare scurta);
+   dezavantaj = tinde sa fragmenteze memoria la INCEPUTUL listei (zone mici raman des la
+   inceput dupa alocari repetate).
+   Worst Fit: avantaj = lasa resturi mai mari dupa alocare (mai reutilizabile teoretic);
+   dezavantaj = consuma rapid zonele mari, ramanand fara zone mari pentru cereri viitoare mari;
+   in practica are de obicei performanta si fragmentare mai proaste decat First Fit/Best Fit.
+
+Q: Avantaj/dezavantaj alocare segmentata vs paginata?
+A: Segmentare: avantaj = corespunde logic structurii programului (cod, stiva, heap ca unitati
+   logice de dimensiuni variabile, usor de partajat/protejat separat); dezavantaj = fragmentare
+   EXTERNA (segmentele au dimensiuni variabile, pot ramane goluri neutilizabile intre ele).
+   Paginare: avantaj = FARA fragmentare externa (toate paginile au aceeasi dimensiune fixa);
+   dezavantaj = fragmentare INTERNA (ultima pagina a unui proces poate fi partial goala) si
+   nu are corespondent direct cu structura logica a programului.
+
+Q: Avantaj/dezavantaj cache set-asociativ vs direct-mapped?
+A: Set-asociativ: avantaj = mai putine conflicte de mapare (mai multe linii pot ocupa acelasi
+   "set", reducand rata de miss din coliziuni); dezavantaj = hardware mai complex/scump si
+   timp de acces putin mai mare (trebuie comparate mai multe taguri simultan).
+   Direct-mapped: avantaj = simplu si rapid (o singura locatie posibila -> o singura comparatie);
+   dezavantaj = rata mare de conflict-miss daca datele folosite concurent mapeaza pe aceeasi linie.
+
+Q: Cate threaduri pentru procesarea a un milion de fisiere?
+A: Nu are sens sa creezi 1 milion de threaduri (overhead de creare/context-switch enorm,
+   posibil sa depaseasca limitele de resurse ale sistemului). Numarul optim e legat de
+   numarul de nuclee CPU disponibile (ex: de ordinul zecilor, aprox 2x numarul de nuclee
+   pentru task-uri care includ si asteptare IO), folosind un thread pool care preia fisierele
+   dintr-o coada de lucru (work queue), NU un thread per fisier.
+
+Q: 3 moduri de a afla dimensiunea unui fisier in linia de comanda:
+A: 1) ls -l fisier   (coloana dimensiune)
+   2) stat -c %s fisier
+   3) wc -c < fisier
+   4) du -b fisier   (varianta alternativa)
+
+Q: Marcheaza cine executa fiecare linie (Parinte/Copil/Ambele):
+    k = fork();                    -> [Ambele] (ambele procese ajung sa execute instructiunea)
+    if(k == 0) {                   -> [Ambele] (ambele evalueaza conditia)
+        printf("A\n");             -> [Copil]  (doar cand k==0, adica in copil)
+    } else {
+        printf("B\n");             -> [Parinte]
+    }
+    printf("C\n");                 -> [Ambele]
+
+
+################################################################################
+PARTEA 10: TEORIE SISTEME DE OPERARE - RECAPITULARE COMPLETA
+    (Process states, Scheduling, Deadlock, Memory Management, File System)
+################################################################################
+
+================================================================================
+10.1 PROCESS STATES (starile unui proces)
+================================================================================
+
+STARILE DE BAZA:
+    NEW (New/Created)   -> procesul e in curs de creare, nu e inca in tabela de procese
+    READY               -> procesul e pregatit sa ruleze, asteapta doar CPU-ul
+    RUNNING             -> procesul ruleaza EFECTIV pe un CPU/core
+    WAITING / BLOCKED   -> procesul asteapta un EVENIMENT (I/O, semnal, lock, etc.), 
+                            NU poate rula chiar daca ar avea CPU disponibil
+    TERMINATED (Zombie) -> procesul a terminat executia, dar parintele nu a facut inca wait()
+
+DIAGRAMA DE TRANZITII (cea mai importanta figura de la examen):
+
+    NEW --(admis in sistem)--> READY
+    READY --(scheduler dispatch: i se da CPU)--> RUNNING
+    RUNNING --(timeout / preemptie / scheduler ii ia CPU-ul)--> READY
+    RUNNING --(cere I/O sau asteapta un eveniment/lock)--> WAITING
+    WAITING --(evenimentul s-a produs / I/O s-a terminat)--> READY
+    RUNNING --(exit())--> TERMINATED
+
+    IMPORTANT: NU EXISTA tranzitie directa WAITING -> RUNNING! Un proces blocat 
+    trebuie OBLIGATORIU sa treaca prin READY inainte sa ruleze din nou (planificatorul
+    decide cand ii da CPU, nu se intampla automat cand evenimentul se termina).
+
+CAND se schimba starea din RUN in READY?
+    Cand planificatorul ii RETRAGE CPU-ul desi procesul e in continuare gata sa ruleze
+    (nu e blocat) -- de obicei la expirarea cuantei de timp (preemptie), sau la aparitia
+    unui proces cu prioritate mai mare.
+
+CAND se schimba din RUN in WAITING?
+    Cand procesul face un apel de sistem care necesita asteptare: read() de pe disc,
+    wait() pentru un copil, sem_wait() pe un semafor la 0, etc.
+
+DE CE SUNT PROBLEMATICE PROCESELE ZOMBIE (TERMINATED nefacut wait)?
+    Ocupa un slot din tabela de procese (finita ca dimensiune) desi nu mai consuma
+    CPU/memorie semnificativa. Daca se acumuleaza foarte multe, se pot epuiza sloturile
+    din tabela de procese / PID-urile disponibile.
+
+================================================================================
+10.2 SCHEDULING (PLANIFICAREA PROCESELOR)
+================================================================================
+
+--------------------------------------------------------------------------------
+10.2.1 CRITERII DE PLANIFICARE (formule de retinut)
+--------------------------------------------------------------------------------
+Pentru un job cu: Sosire (Arrival Time - AT), Durata (Burst Time - BT), 
+Terminare (Completion Time - CT), Deadline (D):
+
+    Turnaround Time (T) = CT - AT              (timpul total petrecut in sistem)
+    Waiting Time (W)    = T - BT = (CT - AT) - BT   (timpul petrecut asteptand, fara sa ruleze)
+    Response Time       = (momentul primei rulari) - AT   (relevant la planificare interactiva)
+    Delay/Tardiness     = max(0, CT - D)        (cat de mult a intarziat fata de deadline)
+
+--------------------------------------------------------------------------------
+10.2.2 ALGORITMI NON-PREEMPTIVI
+--------------------------------------------------------------------------------
+FCFS (First Come First Served)
+    - se executa in ordinea SOSIRII, fara intrerupere
+    - simplu, dar poate avea "convoy effect" (un job lung blocheaza multe joburi scurte)
+
+SJF (Shortest Job First)
+    - NON-preemptiv: alege, la momentul in care CPU e liber, jobul cu cea mai MICA
+      durata TOTALA dintre cele deja sosite; odata pornit, ruleaza pana la final
+    - optim pentru waiting time mediu DACA toate joburile sosesc simultan
+
+--------------------------------------------------------------------------------
+10.2.3 ALGORITMI PREEMPTIVI
+--------------------------------------------------------------------------------
+STCF / SRTF (Shortest Time-to-Completion First / Shortest Remaining Time First)
+    - varianta PREEMPTIVA a SJF: la sosirea unui job nou, daca timpul lui RAMAS e mai
+      mic decat timpul RAMAS al jobului curent, planificatorul INTRERUPE jobul curent
+    - minimizeaza optim waiting time mediu cand joburile sosesc la momente diferite
+
+Round Robin (RR)
+    - fiecare proces primeste un CUANTA de timp fixa (time slice/quantum); daca nu
+      termina in acel timp, e pus la finalul cozii READY si urmatorul e ales
+    - cuanta MICA -> raspuns rapid dar overhead mare de context-switch
+    - cuanta MARE -> se comporta aproape ca FCFS
+
+Priority Scheduling
+    - fiecare proces are o prioritate; ruleaza mereu cel cu prioritatea cea mai mare
+    - problema: STARVATION (un proces cu prioritate mica poate sa nu ruleze niciodata)
+    - solutie: AGING (prioritatea creste progresiv cu timpul de asteptare)
+
+MLFQ (Multi-Level Feedback Queue)
+    - mai multe cozi, cu prioritati diferite si cuante diferite (cozile de prioritate
+      mare au cuante mici, cele de prioritate mica au cuante mari)
+    - un proces care consuma toata cuanta e retrogradat la o coada de prioritate mai mica
+      (presupus a fi un job "greu"/CPU-bound); un proces care cere I/O rapid ramane/e
+      promovat la coada de prioritate mare (presupus interactiv)
+
+EDF (Earliest Deadline First)
+    - PREEMPTIV: ruleaza mereu jobul cu DEADLINE-UL cel mai apropiat
+    - optim pentru sisteme real-time (garanteaza respectarea deadline-urilor daca 
+      utilizarea CPU e sub 100%: suma BT_i/Perioada_i <= 1)
+
+--------------------------------------------------------------------------------
+10.2.4 EXEMPLE REZOLVATE SCHEDULING
+--------------------------------------------------------------------------------
+
+EX 1) Job-uri (Nume/Durata/Deadline): A/5/7, B/2/4, C/4/13, D/3/8
+      Planifica-le astfel incat SUMA INTARZIERILOR (delay) sa fie MINIMA.
+
+    REZOLVARE: pentru minimizarea sumei intarzierilor cand toate sosesc la momentul 0
+    si nu avem preemptie, se aplica euristica "Earliest Deadline First" pe ordinea de
+    executie (echivalent cu algoritmul lui Moore-Hodgson in caz general, dar pt un
+    numar mic de joburi se poate incerca direct ordinea deadline-urilor):
+
+    Ordonam dupa deadline crescator: B(4), A(7), D(8), C(13)
+    Executie: B[0-2], A[2-7], D[7-10], C[10-14]
+    - B: CT=2, deadline=4  -> delay = max(0, 2-4) = 0
+    - A: CT=7, deadline=7  -> delay = max(0, 7-7) = 0
+    - D: CT=10, deadline=8 -> delay = max(0, 10-8) = 2
+    - C: CT=14, deadline=13-> delay = max(0, 14-13) = 1
+    SUMA INTARZIERI = 0+0+2+1 = 3
+    RASPUNS: ordinea B, A, D, C, cu suma intarzierilor minima = 3
+
+EX 2) Job-uri: A/5/9, B/7/11, C/1/10 -- planifica-le astfel incat TOATE sa-si respecte
+      deadline-ul.
+
+    REZOLVARE: incercam EDF (Earliest Deadline First) ca euristica de start:
+    Ordine dupa deadline: A(9), C(10), B(11)
+    Executie: A[0-5], C[5-6], B[6-13]
+    - A: CT=5 <= 9  OK
+    - C: CT=6 <= 10 OK
+    - B: CT=13 > 11  NU RESPECTA deadline-ul!
+
+    Incercam alta ordine, punand C (foarte scurt) inainte, apoi A, apoi B:
+    Ordine: C, A, B
+    Executie: C[0-1], A[1-6], B[6-13]
+    - C: CT=1 <=10 OK
+    - A: CT=6 <=9  OK
+    - B: CT=13 > 11 NU RESPECTA (B are nevoie de 7, iar deadline-ul lui e 11, dar
+      abia poate porni la momentul 6, deci CT=13 > 11 indiferent de ordine, DACA
+      toate 3 se executa secvential fara intrerupere)
+
+    Verificare: suma duratelor = 5+7+1 = 13, iar cel mai mic deadline dintre toate e 9,
+    cel mai mare e 11 < 13. Deci NU exista nicio ordine SECVENTIALA (fara preemptie
+    si fara paralelism) in care toate 3 sa-si respecte deadline-ul, pentru ca suma
+    duratelor (13) > cel mai mare deadline (11).
+    RASPUNS: nu exista o planificare valida cu aceste constrangeri; se poate justifica
+    exact prin acest calcul (suma BT > max deadline => cel putin un job va intarzia).
+
+EX 3) 5 procese cu burst times 6,8,7,3,4, sosite toate la momentul 0. Calculeaza 
+      waiting time mediu pentru SJF.
+
+    REZOLVARE: SJF ordoneaza crescator: 3,4,6,7,8
+    Executie: [0-3],[3-7],[7-13],[13-20],[20-28]
+    Waiting time (= momentul de start, cand toate sosesc la 0): 0,3,7,13,20
+    Waiting time mediu = (0+3+7+13+20)/5 = 43/5 = 8.6
+
+================================================================================
+10.3 DEADLOCK
+================================================================================
+
+--------------------------------------------------------------------------------
+10.3.1 DEFINITIE SI CONDITIILE COFFMAN (toate 4 trebuie sa fie simultan adevarate)
+--------------------------------------------------------------------------------
+Deadlock = o situatie in care 2 sau mai multe procese/threaduri sunt blocate PERMANENT,
+fiecare asteptand o resursa detinuta de altul din grup, fara sa existe nicio posibilitate
+ca vreunul sa mai avanseze.
+
+1) MUTUAL EXCLUSION    - resursele implicate pot fi detinute de un singur proces la un
+                          moment dat (nu pot fi partajate)
+2) HOLD AND WAIT        - un proces detine deja o resursa si ASTEAPTA sa mai obtina alta
+3) NO PREEMPTION         - o resursa NU poate fi luata cu forta de la un proces, trebuie
+                          eliberata voluntar de detinator
+4) CIRCULAR WAIT         - exista un lant CIRCULAR de procese, fiecare asteptand o
+                          resursa detinuta de urmatorul din lant (P1 asteapta resursa
+                          detinuta de P2, P2 asteapta de la P3, ..., Pn asteapta de la P1)
+
+--------------------------------------------------------------------------------
+10.3.2 STRATEGII DE TRATARE A DEADLOCK-ULUI
+--------------------------------------------------------------------------------
+PREVENIRE (Prevention) -- se elimina STRUCTURAL una din cele 4 conditii Coffman:
+    - elimina Mutual Exclusion: nu se poate mereu (unele resurse SUNT inerent exclusive)
+    - elimina Hold and Wait: procesul cere TOATE resursele de care are nevoie DINAINTE
+      de a incepe (sau elibereaza tot ce are inainte sa mai ceara altceva)
+    - elimina No Preemption: se permite retragerea fortata a resurselor de la un proces
+    - elimina Circular Wait: se impune o ORDINE TOTALA de cerere a resurselor (toate
+      procesele cer resursele in aceeasi ordine, ex: mereu resursa cu ID mai mic prima)
+      -- ACEASTA e solutia cea mai des folosita in practica pentru mutexi multipli
+
+EVITARE (Avoidance) -- sistemul verifica DINAMIC, inainte de a acorda o resursa, daca
+    acordarea ar putea duce la o STARE NESIGURA (unsafe state):
+    - ALGORITMUL BANKERULUI (Banker's Algorithm): fiecare proces declara DINAINTE
+      maximul de resurse de care ar putea avea nevoie; sistemul acorda o cerere doar
+      daca, dupa acordare, mai exista o secventa SIGURA (safe sequence) in care toate
+      procesele isi pot termina executia
+
+DETECTIE + RECUPERARE (Detection & Recovery):
+    - sistemul permite deadlock-ul sa se produca, dar il DETECTEAZA periodic (folosind
+      un graf de alocare a resurselor / wait-for graph, cautand cicluri)
+    - la detectie, se recupereaza prin: terminarea fortata a unui/unor procese din ciclu,
+      sau prin PREEMPTAREA resurselor de la un proces (rollback)
+
+IGNORARE (Ostrich Algorithm)
+    - se ignora complet problema, presupunand ca deadlock-urile sunt suficient de rare
+      incat costul prevenirii/detectiei nu merita (abordarea folosita de multe SO
+      generale, inclusiv Linux/Windows, pentru cazul general)
+
+CE POATE FACE PROGRAMATORUL (raspuns tipic la examen pentru mutex-uri multiple):
+    - Impune o ORDINE GLOBALA de blocare a mutexilor (toate threadurile fac lock
+      intotdeauna in aceeasi ordine) -> elimina circular wait
+    - Foloseste pthread_mutex_trylock in loc de lock, si daca nu poate obtine al doilea
+      mutex, elibereaza-l pe primul si reincearca mai tarziu -> elimina hold-and-wait
+    - Foloseste timeout-uri (pthread_mutex_timedlock)
+
+================================================================================
+10.4 MEMORY MANAGEMENT
+================================================================================
+
+--------------------------------------------------------------------------------
+10.4.1 ADDRESS TRANSLATION (translatarea adreselor)
+--------------------------------------------------------------------------------
+Adresa LOGICA (virtuala) = adresa generata de CPU/program, relativa la spatiul propriu
+    al procesului (fiecare proces "crede" ca are toata memoria pentru el)
+Adresa FIZICA = adresa REALA din memoria RAM
+
+MMU (Memory Management Unit) = componenta hardware care traduce adresa logica in 
+    adresa fizica, la FIECARE acces la memorie, transparent pentru program
+
+METODA SIMPLA (relocare cu registre baza+limita):
+    Adresa fizica = Adresa logica + Registru BAZA (base register)
+    Se verifica: Adresa logica < Registru LIMITA (limit register), altfel eroare
+    (folosita la alocarea cu PARTITII FIXE/absolute)
+
+EX) Alocare cu partitii fixe absolute -- cum se calculeaza adresa?
+    Adresa fizica = Adresa relativa (data de program) + Adresa de baza a partitiei
+    alocate acelui proces. Se verifica limita partitiei pentru protectie (adresa 
+    relativa nu poate depasi dimensiunea partitiei).
+
+--------------------------------------------------------------------------------
+10.4.2 PAGING (PAGINARE)
+--------------------------------------------------------------------------------
+Principiu: memoria fizica e impartita in FRAME-uri (cadre) de dimensiune FIXA, memoria
+logica a procesului e impartita in PAGINI de ACEEASI dimensiune. O pagina poate fi
+plasata in ORICE frame liber (nu trebuie contiguitate).
+
+Adresa logica = (numar_pagina, offset)
+    - numar_pagina = biti de ordin superior ai adresei
+    - offset       = biti de ordin inferior (pozitia in interiorul paginii), 
+                      offset = log2(dimensiune_pagina) biti
+
+PAGE TABLE (tabela de pagini): pentru fiecare proces, mapeaza numar_pagina -> numar_frame
+    Fiecare intrare (PTE - Page Table Entry) contine, tipic:
+    - numarul frame-ului fizic corespunzator
+    - VALID BIT (present bit): daca pagina e in memorie fizica sau nu (altfel -> page fault)
+    - DIRTY BIT (modified bit): daca pagina a fost MODIFICATA de la incarcare (trebuie
+      scrisa inapoi pe disc daca e evacuata)
+    - REFERENCE BIT (used bit): daca pagina a fost ACCESATA recent (folosit de algoritmii
+      de inlocuire precum NRU, Clock)
+    - biti de PROTECTIE (read/write/execute)
+
+TLB (Translation Lookaside Buffer): un CACHE HARDWARE mic si rapid pentru cele mai
+    recent folosite traduceri (numar_pagina -> numar_frame), pentru a evita accesarea
+    tabelei de pagini din memorie la FIECARE acces (care ar dubla timpul de acces)
+
+PAGINARE MULTINIVEL (multi-level paging): pentru spatii de adrese mari, tabela de
+    pagini insasi e prea mare pentru a fi tinuta integral in memorie -> se imparte in
+    mai multe niveluri (ex: tabela de pagini de nivel 1 -> pointeaza catre tabele de
+    nivel 2 -> care pointeaza catre frame-uri), astfel doar partile FOLOSITE ale
+    tabelei sunt alocate efectiv
+
+INVERTED PAGE TABLE: o SINGURA tabela pentru TOT sistemul (nu una per proces), 
+    indexata pe FRAME (nu pe pagina), care retine ce proces si ce pagina logica
+    ocupa fiecare frame -- economiseste mult spatiu cand spatiul de adrese e enorm
+
+EX) Cati biti sunt necesari pentru offset, daca dimensiunea paginii e 4KB?
+    4KB = 4096 = 2^12 -> offset are nevoie de 12 biti
+
+EX) Cate intrari are o tabela de pagini, daca adresa logica e pe 32 biti si 
+    dimensiunea paginii e 4KB (2^12)?
+    numar_pagina = 32 - 12 = 20 biti -> 2^20 intrari posibile in tabela de pagini
+
+--------------------------------------------------------------------------------
+10.4.3 SEGMENTATION (SEGMENTARE)
+--------------------------------------------------------------------------------
+Principiu: memoria logica e impartita in SEGMENTE de dimensiune VARIABILA, cu semnificatie
+LOGICA (cod, date, stiva, heap sunt segmente separate), NU dimensiune fixa ca la paginare.
+
+Adresa logica = (numar_segment, offset_in_segment)
+
+SEGMENT TABLE: pentru fiecare segment, retine (BAZA, LIMITA) -- adresa de start in
+    memoria fizica si dimensiunea segmentului. Adresa fizica = Baza[segment] + offset,
+    cu verificare offset < Limita[segment]
+
+DIFERENTA FATA DE PAGINARE:
+    - Segmentare: unitati de dimensiune VARIABILA, corespund structurii LOGICE a
+      programului -- avantaj: protectie/partajare naturala pe segmente (ex: codul poate
+      fi read-only si partajat intre procese); dezavantaj: FRAGMENTARE EXTERNA (segmente
+      de dimensiuni diferite lasa goluri neutilizabile intre ele in memoria fizica)
+    - Paginare: unitati de dimensiune FIXA, FARA legatura cu structura logica -- avantaj:
+      FARA fragmentare externa; dezavantaj: FRAGMENTARE INTERNA (ultima pagina a unui
+      segment/proces poate fi doar partial folosita) si nu are corespondent cu structura
+      logica a programului (mai greu de protejat selectiv o "functie" sau "structura de date")
+
+--------------------------------------------------------------------------------
+10.4.4 CACHES (MEMORIE CACHE)
+--------------------------------------------------------------------------------
+Cache = memorie mica si RAPIDA, intre CPU si RAM, care retine copii ale datelor recent
+    folosite, exploatand PRINCIPIUL LOCALITATII:
+    - Localitate TEMPORALA: o adresa accesata recent va fi probabil accesata din nou curand
+    - Localitate SPATIALA: adresele APROPIATE de una accesata recent vor fi probabil 
+      accesate curand (de aceea se incarca CACHE LINES/BLOCURI intregi, nu octeti individuali)
+
+O adresa se imparte in 3 componente pentru cache: (TAG, INDEX, OFFSET)
+    - OFFSET: pozitia in interiorul liniei de cache (depinde de dimensiunea liniei)
+    - INDEX: care "set"/linie din cache poate contine acest bloc
+    - TAG: restul bitilor, folositi ca sa verifice DACA acel set contine EXACT blocul cautat
+
+TIPURI DE CACHE (organizare):
+    DIRECT-MAPPED: fiecare bloc de memorie mapeaza intr-o SINGURA linie de cache posibila
+        (calculata prin INDEX = adresa mod nr_linii)
+        - avantaj: simplu si rapid (o singura comparatie de tag)
+        - dezavantaj: rata mare de CONFLICT MISS (2 blocuri diferite, folosite alternativ,
+          care mapeaza pe aceeasi linie, se "scot" reciproc mereu)
+
+    FULLY-ASSOCIATIVE: un bloc poate fi plasat in ORICE linie de cache
+        - avantaj: elimina complet conflict miss-urile
+        - dezavantaj: hardware complex/scump (trebuie comparate TOATE liniile simultan)
+
+    SET-ASSOCIATIVE (N-way): cache-ul e impartit in SETURI, fiecare set are N linii;
+        un bloc mapeaza intr-un SET specific (prin INDEX), dar poate fi in ORICARE din
+        cele N linii ale acelui set
+        - avantaj fata de direct-mapped: mai putine conflict miss-uri (N sanse per set)
+        - dezavantaj fata de direct-mapped: hardware mai complex, timp de acces putin mai
+          mare (trebuie comparate N taguri simultan in setul respectiv)
+
+POLITICI DE SCRIERE:
+    WRITE-THROUGH: fiecare scriere in cache e IMEDIAT propagata si in memoria principala
+        -- simplu, consistent, dar mai lent (fiecare write costa un acces la RAM)
+    WRITE-BACK: scrierea se face DOAR in cache, marcand linia ca "dirty"; se scrie in
+        RAM abia cand linia e EVACUATA din cache -- mai rapid, dar mai complex
+
+--------------------------------------------------------------------------------
+10.4.5 REPLACEMENT POLICIES (POLITICI DE INLOCUIRE A PAGINILOR/LINIILOR)
+--------------------------------------------------------------------------------
+Cand memoria/cache-ul e plina si trebuie adus un bloc/pagina noua, trebuie EVACUATA
+o pagina/linie existenta. Algoritmi:
+
+OPTIMAL (Belady's Algorithm)
+    - evacueaza pagina care va fi folosita CEL MAI TARZIU in viitor (sau niciodata)
+    - IMPOSIBIL de implementat in practica (necesita cunoasterea viitorului), dar
+      folosit ca REFERINTA teoretica (limita superioara de performanta)
+
+FIFO (First In First Out)
+    - evacueaza pagina care a fost ADUSA cea mai devreme in memorie (indiferent daca
+      a fost folosita recent sau nu)
+    - simplu, dar poate suferi de BELADY'S ANOMALY: cresterea numarului de frame-uri
+      disponibile poate, contraintuitiv, sa CREASCA numarul de page faults
+
+LRU (Least Recently Used)
+    - evacueaza pagina care NU a fost folosita cel mai mult timp (cea mai "veche" 
+      utilizare) -- aproximeaza bine OPTIMAL, exploatand localitatea temporala
+    - implementare exacta costisitoare (necesita evidenta ordinii exacte de acces);
+      in practica se aproximeaza (ex: cu contoare sau liste)
+
+LFU (Least Frequently Used)
+    - evacueaza pagina folosita cel mai RAR (numar total de accesari cel mai mic)
+
+NRU (Not Recently Used)
+    - foloseste 2 biti per pagina: R (Referenced) si M (Modified/dirty)
+    - clasifica paginile in 4 clase: 
+        clasa 0: R=0,M=0 (nefolosita, necurata)      -- PRIORITATE MAXIMA la evacuare
+        clasa 1: R=0,M=1 (nefolosita recent, dar murdara)
+        clasa 2: R=1,M=0 (folosita recent, curata)
+        clasa 3: R=1,M=1 (folosita recent SI murdara) -- cel mai putin prioritara
+    - se alege o pagina din prima clasa nevida gasita (0 preferata daca exista)
+
+CLOCK / SECOND CHANCE
+    - varianta eficienta de aproximare a LRU: paginile sunt intr-un cerc (buffer circular)
+      cu un "ac" (pointer); fiecare pagina are un bit R (referenced)
+    - la nevoie de evacuare: se verifica pagina indicata de ac; daca R=0, se evacueaza;
+      daca R=1, se seteaza R=0 (ii da "a doua sansa") si acul avanseaza la urmatoarea
+
+RANDOM
+    - evacueaza o pagina ALEATOARE -- simplu, dar performanta imprevizibila
+
+EX) Ce pagina alege NRU cu prioritate maxima?
+    Clasa 0 (R=0, M=0) -- pagina nefolosita recent SI necurata (nu trebuie scrisa
+    inapoi pe disc), deci cea mai "ieftina" de evacuat.
+
+--------------------------------------------------------------------------------
+10.4.6 FREE SPACE MANAGEMENT (gestiunea spatiului liber)
+--------------------------------------------------------------------------------
+STRUCTURI DE EVIDENTA A SPATIULUI LIBER:
+    BITMAP: un vector de biti, cate un bit per bloc/unitate de alocare (0=liber, 1=ocupat)
+        - avantaj: simplu, cautare rapida de blocuri contigue
+        - dezavantaj: consuma spatiu proportional cu numarul de blocuri, indiferent
+          cate sunt de fapt libere
+    LINKED LIST (lista de zone libere): fiecare zona libera contine un pointer catre
+        urmatoarea zona libera -- consuma spatiu doar proportional cu NUMARUL de zone
+        libere (nu cu dimensiunea totala), dar cautarea e mai lenta (trebuie parcursa lista)
+
+ALGORITMI DE ALOCARE (cand o cerere de marime M trebuie satisfacuta dintr-o lista de zone):
+    FIRST FIT: aloca din PRIMA zona liberia suficient de mare, in ordinea listei
+        - avantaj: rapid (se opreste la prima potrivire)
+        - dezavantaj: tinde sa fragmenteze memoria la INCEPUTUL listei
+
+    BEST FIT: aloca din cea MAI MICA zona care e totusi suficient de mare
+        - avantaj: minimizeaza risipa la fiecare alocare individuala
+        - dezavantaj: lasa multe resturi FOARTE MICI (aproape inutilizabile), 
+          necesita parcurgerea intregii liste (mai lent)
+
+    WORST FIT: aloca din cea MAI MARE zona libera disponibila
+        - avantaj: resturile ramase sunt mai mari, teoretic mai reutilizabile
+        - dezavantaj: consuma rapid zonele mari, ramanand fara zone mari pentru
+          cereri viitoare mari; in practica performanta si fragmentarea sunt de obicei
+          mai proaste decat First Fit/Best Fit
+
+    BUDDY SYSTEM: memoria e impartita recursiv in jumatati (blocuri de dimensiuni
+        putere a lui 2); o cerere e rotunjita la cea mai mica putere a lui 2 care o
+        poate satisface, iar blocul e impartit recursiv (in "buddies") pana ajunge la
+        dimensiunea potrivita. La eliberare, blocurile "buddy" adiacente libere se pot
+        recombina automat -- avantaj: recombinare RAPIDA si simpla; dezavantaj:
+        FRAGMENTARE INTERNA (rotunjirea la puteri de 2 poate risipi spatiu)
+
+FRAGMENTARE:
+    INTERNA: spatiu ALOCAT unui proces care nu e efectiv folosit (ex: ultima pagina
+        partial goala la paginare, sau rotunjirea la buddy system)
+    EXTERNA: spatiu LIBER, dar impartit in bucati prea mici/dispersate ca sa poata
+        satisface o cerere (desi suma lor ar fi suficienta) -- specifica alocarii
+        cu zone de dimensiune variabila (segmentare, malloc pe heap)
+
+EX) Worst Fit, lista initiala 32, 44, 98, doua malloc(33):
+    malloc(33) #1: cea mai mare zona e 98 -> se aloca din ea, ramane 98-33=65
+        Lista: 32, 44, 65
+    malloc(33) #2: cea mai mare zona e acum 65 -> se aloca din ea, ramane 65-33=32
+        Lista: 32, 44, 32
+    RASPUNS FINAL: 32, 44, 32
+
+================================================================================
+10.5 FILE SYSTEM
+================================================================================
+
+--------------------------------------------------------------------------------
+10.5.1 LINUX INODE
+--------------------------------------------------------------------------------
+Inode (index node) = structura de date care contine TOATE metadatele unui fisier,
+    CU EXCEPTIA numelui (numele fisierului e stocat separat, in DIRECTOR, ca o
+    asociere nume -> numar de inode).
+
+CE CONTINE UN INODE:
+    - tipul fisierului (regular, director, link simbolic, FIFO, device, etc.)
+    - permisiuni (read/write/execute pentru owner/group/others)
+    - owner (UID) si group (GID)
+    - dimensiunea fisierului (in octeti)
+    - timestamps: atime (access), mtime (modification), ctime (inode change)
+    - LINK COUNT: numarul de HARD LINK-uri (nume de director) care pointeaza la acest inode
+    - pointeri catre BLOCURILE DE DATE: 
+        * cateva pointeri DIRECTI (D directi) -- pointeaza direct la blocuri de date
+        * 1 pointer INDIRECT SIMPLU -- pointeaza la un bloc care contine B/A pointeri
+          directi catre blocuri de date (unde B=dimensiune bloc, A=dimensiune adresa)
+        * 1 pointer INDIRECT DUBLU -- pointeaza la un bloc de pointeri indirecti simpli,
+          adreseaza (B/A)^2 blocuri de date
+        * 1 pointer INDIRECT TRIPLU -- adreseaza (B/A)^3 blocuri de date
+
+FORMULA DIMENSIUNE MAXIMA FISIER (D pointeri directi, bloc=B octeti, adresa=A octeti):
+    Dimensiune_max = B * ( D + (B/A) + (B/A)^2 + (B/A)^3 )
+
+HARD LINK vs SYMBOLIC LINK:
+    HARD LINK: o intrare de director care pointeaza catre ACELASI numar de inode ca
+        alt nume -- practic 2 nume pentru EXACT acelasi fisier (acelasi continut,
+        aceleasi metadate). NU poate trece intre PARTITII diferite (inode-urile sunt
+        specifice unui filesystem) si de obicei NU se poate face catre un director.
+        Stergerea unui nume NU sterge datele decat cand link count-ul ajunge la 0.
+    SYMBOLIC LINK (soft link): un fisier SEPARAT (cu inode propriu) care contine 
+        CALEA catre alt fisier. Poate trece intre partitii si poate puncta catre
+        directoare. Daca fisierul tinta e sters, linkul ramane dar devine "broken"
+        (dangling link).
+
+CE SE INTAMPLA CAND STERGI UN FISIER CU HARD LINK-URI MULTIPLE?
+    Datele NU se sterg -- doar se decrementeaza link count-ul inode-ului si se elimina
+    intrarea de director respectiva. Datele raman accesibile prin celelalte hard link-uri
+    ramase. Doar cand link count-ul ajunge la 0 (SI nu mai exista niciun file descriptor
+    deschis catre el) sunt efectiv eliberate blocurile de date si inode-ul.
+
+--------------------------------------------------------------------------------
+10.5.2 SUPERBLOCK
+--------------------------------------------------------------------------------
+Superblock = structura care contine metadatele DESPRE INTREG FILESYSTEMUL (nu despre
+    un fisier individual):
+    - tipul de filesystem, dimensiunea totala
+    - dimensiunea blocului
+    - numarul total si numarul LIBER de i-noduri
+    - numarul total si numarul LIBER de blocuri de date
+    - informatii de montare (mount status)
+    - pointeri catre structurile de gestiune a spatiului liber (bitmap-uri de
+      i-noduri/blocuri libere)
+
+--------------------------------------------------------------------------------
+10.5.3 RAID (Redundant Array of Independent Disks)
+--------------------------------------------------------------------------------
+RAID 0 (STRIPING, fara redundanta)
+    - datele sunt IMPARTITE (striped) intre N discuri, fara nicio copie de siguranta
+    - PERFORMANTA: excelenta (citire/scriere in paralel pe toate discurile)
+    - FIABILITATE: proasta -- daca UN SINGUR disc se defecteaza, se pierd TOATE datele
+    - Capacitate utila = N * capacitate_disc (100% din spatiu, nimic pentru redundanta)
+
+RAID 1 (MIRRORING)
+    - datele sunt DUPLICATE identic pe 2 (sau mai multe) discuri
+    - FIABILITATE: foarte buna -- poate supravietui defectarii a N-1 discuri (dintre
+      cele oglindite)
+    - Capacitate utila = capacitate_disc (jumatate din spatiul total la 2 discuri)
+    - Performanta la SCRIERE: nu e mai rapida decat un singur disc (trebuie scris pe
+      toate copiile); la CITIRE poate fi mai rapida (se poate citi din orice copie)
+
+RAID 4 (PARITATE DEDICATA)
+    - date striped pe N-1 discuri + UN disc DEDICAT exclusiv pentru PARITATE (XOR)
+    - daca UN disc se defecteaza (oricare, inclusiv paritatea), datele se pot RECONSTRUI
+      din celelalte + paritate
+    - dezavantaj: discul de paritate devine BOTTLENECK (fiecare scriere trebuie sa
+      actualizeze paritatea, indiferent pe care disc de date s-a scris)
+    - Capacitate utila = (N-1) * capacitate_disc
+
+RAID 5 (PARITATE DISTRIBUITA)
+    - ca RAID 4, dar PARITATEA e DISTRIBUITA rotativ pe TOATE discurile (nu pe unul
+      dedicat) -- elimina bottleneck-ul de la RAID 4
+    - poate supravietui defectarii unui SINGUR disc
+    - Capacitate utila = (N-1) * capacitate_disc
+
+RAID 6 (PARITATE DUBLA)
+    - ca RAID 5, dar cu 2 blocuri de paritate distribuite (calculate diferit, ex: 
+      Reed-Solomon) -- poate supravietui defectarii SIMULTANE a 2 discuri
+    - Capacitate utila = (N-2) * capacitate_disc
+
+RAID 10 (1+0, MIRROR + STRIPE)
+    - combina RAID 1 si RAID 0: discurile sunt grupate in perechi oglindite (RAID 1),
+      iar peste aceste perechi se face striping (RAID 0)
+    - performanta foarte buna SI fiabilitate buna (poate supravietui defectarii mai
+      multor discuri, cate timp nu sunt ambele discuri dintr-o aceeasi pereche oglindita)
+    - Capacitate utila = N/2 * capacitate_disc (jumatate din total)
+
+EX) RAID 5 cu 5 discuri de 2TB fiecare - care e capacitatea utila?
+    Capacitate utila = (N-1) * capacitate_disc = (5-1) * 2TB = 8TB
+    (1 disc "echivalent" e "consumat" de paritatea distribuita)
+
+EX) De ce RAID 4 are un bottleneck pe care RAID 5 il elimina?
+    La RAID 4, discul de paritate e UNIC si e implicat in FIECARE operatie de scriere
+    (indiferent pe care disc de date s-a scris, paritatea corespunzatoare trebuie
+    recalculata si rescrisa pe acel disc dedicat) -- devine punct de contentie/bottleneck
+    la scrieri concurente. RAID 5 distribuie paritatea rotativ pe toate discurile, deci
+    scrierile concurente pe blocuri diferite ajung, in medie, pe discuri de paritate
+    diferite, eliminand contentia pe un singur disc.
