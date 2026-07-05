@@ -1,0 +1,815 @@
+================================================================================
+RECAPITULARE: MEMORY MANAGEMENT SI FILE SYSTEM
+================================================================================
+
+
+################################################################################
+PARTEA 1: MEMORY MANAGEMENT
+################################################################################
+
+--------------------------------------------------------------------------------
+1.0 DE CE AVEM NEVOIE DE "MANAGEMENT DE MEMORIE"? (intuitia de baza)
+--------------------------------------------------------------------------------
+Imagineaza-ti ca RAM-ul calculatorului e o CLADIRE cu multe camere goale. In orice
+moment, pot rula MAI MULTE programe simultan (Chrome, Word, jocul tau, etc.) si
+FIECARE dintre ele are nevoie de niste camere din cladire pentru datele lui.
+
+Problemele pe care trebuie sa le rezolve sistemul de operare:
+    1) UNDE punem fiecare program in cladire (RAM)? -> asta e ALOCAREA memoriei
+    2) Cum facem ca un program sa NU poata "intra" in camerele altui program si
+       sa-i strice datele? -> asta e PROTECTIA memoriei
+    3) Ce facem cand cladirea (RAM) e PLINA si mai vine un program nou? -> asta e
+       INLOCUIREA / gestionarea spatiului liber
+    4) Cum face un program sa gaseasca RAPID datele lui, fara sa caute prin toata
+       cladirea de fiecare data? -> asta e ADDRESS TRANSLATION (traducerea adreselor)
+
+Toate subcapitolele de mai jos sunt raspunsuri la aceste 4 intrebari, din unghiuri
+diferite. Tine minte asta cand citesti mai departe -- fiecare tehnica (paginare,
+segmentare, cache, etc.) e doar o METODA DIFERITA de a raspunde la aceleasi 4 intrebari.
+
+--------------------------------------------------------------------------------
+1.1 ADDRESS TRANSLATION (traducerea/translatarea adreselor)
+--------------------------------------------------------------------------------
+
+CE PROBLEMA REZOLVA:
+Cand scrii un program in C si faci, de exemplu, `int x; x = 5;`, variabila x are o
+"adresa" in mintea programului -- SA ZICEM adresa 100. Dar problema e ca programul
+tau NU e singurul care ruleaza pe calculator! Mai sunt si alte 20 de programe care
+ruleaza in acelasi timp, si FIECARE dintre ele "crede" tot la fel, ca are propria
+adresa 100 pentru variabilele lui.
+
+Evident, in RAM-ul FIZIC (real), nu pot exista 20 de lucruri diferite la aceeasi
+adresa 100 -- RAM-ul e o singura cladire, fiecare camera are un numar UNIC.
+
+SOLUTIA: se folosesc DOUA tipuri de adrese, diferite:
+
+    ADRESA LOGICA (se mai numeste si "virtuala")
+        = adresa pe care o vede si o foloseste PROGRAMUL, in mintea lui
+        = e relativa la propriul spatiu al procesului (fiecare proces are propriul
+          "univers" de adrese, de la 0 la maximum, si "crede" ca-l are tot pentru el)
+
+    ADRESA FIZICA
+        = adresa REALA, unde se afla efectiv acea informatie in cipul de RAM
+        = e UNICA in tot sistemul (nu pot exista 2 lucruri la aceeasi adresa fizica)
+
+CINE FACE TRADUCEREA intre cele doua? O componenta HARDWARE speciala numita
+    MMU (Memory Management Unit)
+Practic, MMU e ca un "traducator automat" care sta intre CPU si RAM: de FIECARE
+data cand CPU-ul vrea sa citeasca/scrie la o adresa, MMU traduce PE LOC adresa
+logica (ce a cerut programul) in adresa fizica (unde e cu adevarat in RAM), 
+COMPLET TRANSPARENT pentru program (programul nu-si da seama ca se intampla asta).
+
+METODA CEA MAI SIMPLA de traducere (folosita la "alocare cu partitii fixe"):
+
+    Imagineaza-ti ca RAM-ul e impartit in "bucati" mari (partitii), una pentru fiecare
+    proces. Fiecare proces are 2 numere asociate:
+        - BAZA (base register)  = adresa FIZICA de unde INCEPE partitia lui in RAM
+        - LIMITA (limit register) = cat de MARE e partitia lui (dimensiunea maxima permisa)
+
+    Formula de traducere:
+        Adresa_fizica = Adresa_logica + Baza
+
+    Si, ca sa nu poata un proces sa "iasa" din partitia lui si sa acceseze memoria
+    altui proces (protectie!), se verifica INAINTE:
+        DACA Adresa_logica >= Limita  ATUNCI  eroare (acces interzis / segmentation fault)
+        ALTFEL se face translatarea normal
+
+EXEMPLU CONCRET, pas cu pas:
+    Proces P are Baza=5000, Limita=1000 (partitia lui e intre adresele fizice 5000-5999)
+    Programul P cere sa acceseze adresa LOGICA 300 (in mintea lui, crede ca acceseaza
+    "adresa 300", ca si cum ar fi singurul din calculator)
+
+    Pas 1: se verifica 300 < 1000 (Limita)? DA -> acces permis, se continua
+    Pas 2: Adresa_fizica = 300 + 5000 = 5300
+    Pas 3: MMU acceseaza REALMENTE adresa 5300 din RAM, si ii da programului
+           continutul de acolo, dar programul "crede" ca a accesat adresa 300
+
+    Daca programul ar fi cerut adresa logica 1500:
+    Pas 1: 1500 < 1000 (Limita)? NU -> EROARE, acces interzis (protectie!), programul
+           ar primi un semnal de tip "segmentation fault" si de obicei s-ar termina
+
+DE CE E UTILA ACEASTA METODA?
+    - Fiecare proces poate scrie cod ca si cum ar fi SINGUR pe calculator (adrese
+      simple, de la 0), fara sa se ingrijoreze unde va fi el pus FIZIC in RAM
+    - Sistemul de operare poate pune procesul ORIUNDE gaseste loc in RAM (schimband
+      doar valoarea din Baza), fara sa modifice programul in sine
+    - Un proces nu poate accesa memoria altui proces (protectie automata prin Limita)
+
+    (Metoda asta simpla, cu o singura partitie continua per proces, are insa un
+    dezavantaj mare: cere ca TOATA memoria unui proces sa fie INTR-O SINGURA bucata
+    continua de RAM. Din acest motiv s-au inventat paginarea si segmentarea, mai
+    jos, care sparg memoria in bucati mai mici si mai flexibile.)
+
+
+--------------------------------------------------------------------------------
+1.2 PAGING (PAGINARE)
+--------------------------------------------------------------------------------
+
+ANALOGIE DE INCEPUT:
+Imagineaza-ti o CARTE foarte lunga (memoria logica a unui proces). In loc s-o pui
+INTREAGA, dintr-o piesa, pe un raft foarte lung (ca la metoda cu Baza+Limita),
+o SFASII in PAGINI (capitole de dimensiune fixa, ex: fiecare "pagina" are exact
+4KB). Apoi pui fiecare pagina PE UNDE E LOC LIBER pe rafturi (nu trebuie sa fie
+langa capitolul anterior!). Ai nevoie doar de o LISTA (tabela de pagini) care sa-ti
+spuna "capitolul 1 e pe raftul 47, capitolul 2 e pe raftul 12, capitolul 3 e pe
+raftul 200", etc. -- ordinea fizica nu mai trebuie sa respecte ordinea logica.
+
+DEFINITIA TEHNICA:
+    - Memoria FIZICA (RAM) e impartita in bucati de dimensiune FIXA numite FRAME-uri
+    - Memoria LOGICA a fiecarui proces e impartita in bucati de ACEEASI dimensiune
+      fixa, numite PAGINI
+    - O pagina LOGICA poate fi pusa in ORICE frame FIZIC liber -- nu trebuie sa fie
+      langa alte pagini ale aceluiasi proces! Asta rezolva marea problema de la
+      metoda cu Baza+Limita (nu mai trebuie memorie CONTINUA)
+
+CUM SE IMPARTE O ADRESA LOGICA IN PAGINARE:
+    O adresa logica se citeste ca fiind formata din 2 bucati:
+        (numar_pagina, offset)
+
+    - numar_pagina = ii spune sistemului DIN CE PAGINA face parte adresa respectiva
+    - offset       = ii spune EXACT CE POZITIE, in interiorul acelei pagini, se cere
+                     (offset = "cat de adanc in pagina", intre 0 si dimensiunea paginii - 1)
+
+    Cati biti ii dam offset-ului? Depinde de DIMENSIUNEA paginii:
+        offset are nevoie de log2(dimensiune_pagina) biti
+
+    EXEMPLU: daca o pagina are 4KB = 4096 = 2^12 octeti, atunci offset-ul are nevoie
+    de EXACT 12 biti (pentru ca 2^12 = 4096, deci cu 12 biti poti numerota fiecare
+    din cele 4096 de pozitii posibile in interiorul unei pagini).
+
+    Restul bitilor din adresa logica (tot ce nu e offset) formeaza numarul de pagina.
+    EXEMPLU: daca adresa logica are 32 biti in total, si offset-ul foloseste 12,
+    atunci numar_pagina foloseste 32 - 12 = 20 biti.
+
+TABELA DE PAGINI (Page Table):
+    Sistemul de operare tine, pentru FIECARE proces, o tabela care spune, pentru
+    fiecare numar_pagina, in ce numar_frame se afla EFECTIV in RAM acea pagina.
+    E exact ca "lista de capitole" din analogia de mai sus.
+
+    Fiecare LINIE din aceasta tabela (numita PTE = Page Table Entry) contine, de
+    obicei, mai multe informatii, nu doar numarul de frame:
+
+    - numarul FRAME-ului fizic corespunzator (informatia principala, obligatorie)
+
+    - VALID BIT (se mai numeste si "present bit"): un singur bit (0 sau 1) care
+      spune DACA pagina respectiva e EFECTIV in RAM chiar acum, sau NU.
+      DE CE E NEVOIE de asta? Pentru ca nu toata memoria logica a unui proces
+      trebuie sa fie mereu in RAM (memoria RAM e limitata!). Unele pagini pot fi
+      "puse la pastrare" pe disc (swap), pana cand sunt din nou necesare. Daca un
+      program cere o pagina cu valid_bit=0, sistemul de operare intervine, aduce
+      pagina de pe disc in RAM, si abia apoi ii da programului ce a cerut. Acest
+      eveniment se numeste PAGE FAULT.
+
+    - DIRTY BIT (modified bit): spune DACA pagina a fost MODIFICATA (scrisa) de
+      cand a fost adusa in RAM. E important pentru ca, daca sistemul trebuie sa
+      SCOATA (evacueze) o pagina din RAM ca sa faca loc alteia: 
+        * daca pagina NU e "dirty" (nu a fost modificata), poate fi pur si simplu
+          STEARSA din RAM, fara nicio grija -- oricum exista deja o copie identica
+          pe disc, de unde a fost adusa initial
+        * daca pagina E "dirty" (a fost modificata), TREBUIE mai intai SCRISA
+          inapoi pe disc, ca sa nu se piarda modificarile, si abia apoi evacuata
+
+    - REFERENCE BIT (used bit): spune DACA pagina a fost ACCESATA (citita/scrisa)
+      RECENT. E folosit de algoritmii care decid CE pagina sa evacueze cand RAM-ul
+      e plin (ii vezi mai jos, la "Replacement policies") -- ideea fiind ca o
+      pagina folosita recent probabil va fi folosita din nou in curand, deci NU
+      e o alegere buna sa fie evacuata.
+
+    - biti de PROTECTIE: spun daca pagina poate fi doar CITITA, sau si SCRISA, sau
+      si EXECUTATA ca si cod (util pentru securitate: de exemplu, zona de STACK nu
+      ar trebui sa poata fi executata ca si cod, ca sa previi anumite atacuri).
+
+TLB (Translation Lookaside Buffer):
+    PROBLEMA: tabela de pagini e in RAM, la fel ca datele normale. Deci, ca sa
+    traduci o adresa logica in adresa fizica, ai avea nevoie de UN ACCES la RAM
+    (ca sa citesti tabela de pagini) PLUS un al doilea acces la RAM (ca sa citesti
+    efectiv datele cerute) -- practic, FIECARE acces la memorie ar dura DE DOUA ORI
+    mai mult decat normal! Asta ar fi extrem de lent.
+
+    SOLUTIA: TLB e un CACHE HARDWARE mic si FOARTE rapid (mult mai rapid decat
+    RAM-ul normal), care tine minte cele mai RECENT folosite traduceri
+    (numar_pagina -> numar_frame). Cand CPU-ul are nevoie sa traduca o adresa:
+        - se verifica PRIMA DATA in TLB (foarte rapid)
+        - daca traducerea e deja acolo (TLB HIT) -> se foloseste direct, fara sa
+          mai fie nevoie de acces la tabela de pagini din RAM
+        - daca traducerea NU e in TLB (TLB MISS) -> abia atunci se cauta in tabela
+          de pagini din RAM (mai lent), si rezultatul e SALVAT si in TLB, pentru
+          data viitoare cand va fi nevoie de aceeasi traducere
+
+PAGINARE MULTINIVEL (multi-level paging):
+    PROBLEMA: pentru sisteme cu adrese mari (ex: 32 sau 64 de biti), tabela de
+    pagini in sine ar fi ENORMA. De exemplu, la 32 biti cu pagini de 4KB, am
+    calculat mai sus ca ai nevoie de 2^20 (peste 1 milion) de intrari in tabela de
+    pagini PENTRU FIECARE PROCES -- si majoritatea proceselor NU folosesc toata
+    memoria logica posibila, deci majoritatea acelor intrari ar fi degeaba, risipind
+    memorie.
+
+    SOLUTIA: se imparte tabela de pagini in mai multe NIVELE (ca un arbore):
+        - un "director" de nivel 1, care are relativ putine intrari, fiecare
+          intrare POINTAND catre o tabela de nivel 2
+        - fiecare tabela de nivel 2 contine traducerile EFECTIVE numar_pagina -> frame
+
+    Avantaj: daca un proces NU foloseste o zona mare din spatiul lui de adrese,
+    tabela de nivel 2 corespunzatoare acelei zone PUR SI SIMPLU NU SE ALOCA
+    (economisim memorie -- nu mai trebuie sa existe TOATE intrarile posibile,
+    doar cele efectiv folosite).
+
+INVERTED PAGE TABLE (tabela de pagini inversata):
+    O ABORDARE DIFERITA: in loc de o tabela SEPARATA pentru FIECARE proces
+    (indexata pe numarul de pagina LOGICA), exista o SINGURA tabela, comuna pentru
+    TOT sistemul, indexata pe numarul de FRAME FIZIC. Fiecare intrare din aceasta
+    tabela unica spune "acest frame fizic apartine cui (care proces) si carei
+    pagini logice a acelui proces". 
+    Avantaj: dimensiunea tabelei depinde de cati FRAME-uri FIZICE existe (care e
+    o limita fixa, data de cata RAM ai), NU de cate procese ruleaza sau cat de mare
+    e spatiul logic al fiecaruia -- economie mare de memorie cand spatiile de
+    adrese sunt foarte mari (ex: 64 biti).
+
+EXERCITII REZOLVATE, PAS CU PAS:
+
+EX 1) Un sistem foloseste pagini de 8KB, adrese logice pe 36 biti. Cati biti sunt
+      pentru numarul de pagina, si cate intrari are tabela de pagini?
+
+    Pas 1: 8KB = 8192 octeti = 2^13 -> offset-ul are nevoie de 13 biti
+           (pentru ca 2^13 = 8192, exact dimensiunea unei pagini)
+    Pas 2: numar_pagina = total_biti - offset_biti = 36 - 13 = 23 biti
+    Pas 3: tabela de pagini are 2^23 intrari posibile (una pentru fiecare valoare
+           posibila a lui numar_pagina) = 8.388.608 intrari
+
+EX 2) Un fisier are dimensiunea 10MB, discul foloseste blocuri de 4KB. Cate blocuri
+      ocupa fisierul?
+    Pas 1: 10MB = 10 * 1024 KB = 10240 KB (atentie: 1MB = 1024KB, nu 1000KB!)
+    Pas 2: 10240 KB / 4 KB (dimensiunea unui bloc) = 2560 blocuri
+
+
+--------------------------------------------------------------------------------
+1.3 SEGMENTATION (SEGMENTARE)
+--------------------------------------------------------------------------------
+
+ANALOGIE DE INCEPUT:
+Daca paginarea sparge memoria in bucati de dimensiune FIXA, FARA sa se uite la ce
+inseamna acele bucati (pur mecanic), SEGMENTAREA sparge memoria in bucati care au
+SENS LOGIC pentru programator: "acesta e codul programului", "aceasta e zona de
+date globale", "aceasta e stiva (stack)", "aceasta e zona de heap (malloc)".
+Fiecare din aceste zone se numeste un SEGMENT, si poate avea O DIMENSIUNE DIFERITA
+(nu sunt obligate sa fie toate la fel, ca la paginare).
+
+CUM SE FACE TRADUCEREA ADRESEI:
+    O adresa logica, la segmentare, e formata din:
+        (numar_segment, offset_in_segment)
+
+    Sistemul tine o SEGMENT TABLE (tabela de segmente), care spune, pentru fiecare
+    segment, 2 lucruri:
+        - BAZA = adresa fizica de unde incepe acel segment in RAM
+        - LIMITA = cat de mare e segmentul (ca sa se verifice protectia)
+
+    Adresa_fizica = Baza[numar_segment] + offset_in_segment
+    (cu verificarea obligatorie: offset_in_segment < Limita[numar_segment], altfel eroare)
+
+    Observa cat de SIMILAR e cu metoda Baza+Limita de la 1.1 -- diferenta e ca
+    ACUM avem MAI MULTE perechi (Baza, Limita), una pentru fiecare segment al
+    procesului, nu doar UNA SINGURA pentru tot procesul.
+
+DIFERENTA MAJORA INTRE PAGINARE SI SEGMENTARE (foarte des intrebata la examen!):
+
+    SEGMENTARE:
+        + AVANTAJ: bucatile (segmentele) au SENS LOGIC, corespund structurii reale
+          a programului -- e mai natural sa protejezi/partajezi separat, de exemplu,
+          codul (care poate fi READ-ONLY si PARTAJAT intre mai multe procese care
+          ruleaza acelasi program) fata de stiva (care e privata si scriibila)
+        - DEZAVANTAJ: FRAGMENTARE EXTERNA -- pentru ca segmentele au dimensiuni
+          VARIABILE, in timp, pe masura ce procesele se creeaza si se termina, RAMAN
+          "gauri" libere in memoria fizica, de dimensiuni diferite, care pot fi prea
+          MICI ca sa mai incapa un segment nou, desi SUMA lor totala ar fi suficienta
+
+    PAGINARE:
+        + AVANTAJ: FARA fragmentare externa -- toate paginile au ACEEASI dimensiune
+          fixa, deci ORICE frame liber poate primi ORICE pagina, nu exista "goluri"
+          nefolosibile
+        - DEZAVANTAJ 1: FRAGMENTARE INTERNA -- daca un proces are, sa zicem, nevoie
+          de 4097 octeti, dar paginile sunt de 4096 octeti, procesul va OCUPA 2
+          pagini întregi (8192 octeti), desi foloseste EFECTIV doar 4097 -- restul
+          (4095 octeti din ultima pagina) sunt PIERDUTI, alocati dar nefolositi
+        - DEZAVANTAJ 2: paginile NU au legatura cu structura LOGICA a programului --
+          o singura "functie" sau "structura de date" a programului poate fi
+          impartita, complet arbitrar, intre 2-3 pagini diferite, ceea ce face mai
+          dificila protectia SELECTIVA (de exemplu, "fa doar codul read-only" e mai
+          greu de aplicat exact cand codul e taiat in bucati arbitrare)
+
+    (In practica, sistemele MODERNE de obicei COMBINA cele doua: segmentare la un
+    nivel logic mare -- de exemplu, spatiul de adrese al unui proces Linux e
+    conceptual impartit in segmente cod/date/stack/heap -- iar FIECARE segment e,
+    la randul lui, gestionat prin paginare, ca sa evite fragmentarea externa.)
+
+
+--------------------------------------------------------------------------------
+1.4 CACHES (MEMORIA CACHE)
+--------------------------------------------------------------------------------
+
+ANALOGIE DE INCEPUT:
+Imagineaza-ti ca lucrezi la un birou si ai nevoie de carti dintr-o BIBLIOTECA foarte
+mare, aflata la 10 minute distanta de mers (asta e RAM-ul: mare, dar relativ "incet"
+de accesat comparat cu viteza CPU-ului). Ca sa nu mergi la biblioteca de fiecare
+data cand ai nevoie de o carte, tii pe BIROUL TAU (foarte apropiat, acces instant)
+cateva carti pe care le-ai folosit RECENT sau pe care STII ca le vei folosi in
+continuare. Biroul tau e mic (nu poti tine TOATE cartile din biblioteca acolo), dar
+accesul e mult mai rapid. Acest "birou mic si rapid" e exact ce e CACHE-UL.
+
+DE CE FUNCTIONEAZA ACEASTA IDEE? PRINCIPIUL LOCALITATII:
+    - Localitate TEMPORALA: daca ai folosit o "carte" (o adresa de memorie) RECENT,
+      probabil o vei folosi DIN NOU in curand (ex: o variabila folosita intr-o
+      bucla se acceseaza iar si iar)
+    - Localitate SPATIALA: daca ai folosit o "carte", probabil vei folosi si
+      "cartile de langa ea" in curand (ex: elementele unui vector sunt de obicei
+      accesate in ordine, unul dupa altul)
+    Din cauza localitatii spatiale, cache-ul nu aduce un singur octet la un moment
+    dat, ci un BLOC intreg de octeti apropiati (numit "cache line" / "linie de cache"),
+    pariind ca vei avea nevoie si de vecinii lui in curand.
+
+CUM STIE CACHE-UL UNDE SA PUNA/CAUTE UN BLOC DE MEMORIE?
+    O adresa de memorie se imparte, conceptual, in 3 bucati:
+        (TAG, INDEX, OFFSET)
+
+    - OFFSET: spune EXACT ce pozitie, IN INTERIORUL liniei de cache, se cere
+              (la fel ca offset-ul de la paginare, dar aici e vorba de "linia de cache")
+    - INDEX:  spune in CE "SET" (grup) de linii din cache TREBUIE sa se afle acest
+              bloc, DACA e in cache
+    - TAG:    restul bitilor, folositi ca sa VERIFICI daca acel set contine EXACT
+              blocul cautat (fiecare linie de cache tine minte tag-ul blocului pe
+              care il contine momentan, ca sa poata compara)
+
+CELE 3 TIPURI DE ORGANIZARE A CACHE-ULUI:
+
+    DIRECT-MAPPED (mapare directa)
+        Fiecare bloc de memorie are O SINGURA LOCATIE POSIBILA in cache (calculata
+        cu INDEX). Analogie: e ca si cum ai avea in birou EXACT UN SERTAR pentru
+        fiecare "litera a alfabetului" a cartilor -- toate cartile care comenca cu
+        "A" TREBUIE sa incapa in acelasi sertar, chiar daca ai 50 de carti cu A.
+        + AVANTAJ: foarte SIMPLU si RAPID (o singura comparatie de tag, hardware minim)
+        - DEZAVANTAJ: daca 2 blocuri diferite de memorie, folosite ALTERNATIV de
+          program, "cad" din ghinion in ACELASI sertar (aceeasi locatie de cache),
+          se vor "scoate" reciproc mereu (numit CONFLICT MISS), desi restul cache-ului
+          ar putea fi complet liber si nefolosit in acel moment!
+
+    FULLY-ASSOCIATIVE (complet asociativa)
+        Un bloc de memorie poate fi pus in ORICE locatie libera din cache, fara
+        restrictii. Analogie: biroul tau e un singur "morman" mare, o carte poate
+        fi pusa ORIUNDE in acel morman.
+        + AVANTAJ: elimina COMPLET conflict miss-urile de mai sus
+        - DEZAVANTAJ: pentru a verifica DACA un bloc e in cache, trebuie comparat
+          TAG-ul cu TOATE liniile din cache simultan (hardware mult mai complex si
+          mai scump, mai lent la comparatii cand cache-ul e mare)
+
+    SET-ASSOCIATIVE (N-way) -- COMPROMISUL intre cele doua de mai sus
+        Cache-ul e impartit in SETURI (grupuri), fiecare set avand N locatii ("N-way").
+        Un bloc de memorie mapeaza intr-un SET SPECIFIC (calculat prin INDEX, ca la
+        direct-mapped), DAR, in interiorul acelui set, poate fi pus in ORICARE din
+        cele N locatii (ca la fully-associative, dar limitat doar la acel set).
+        Analogie: ai N sertare pentru litera "A" (nu doar unul), deci mai multe
+        carti cu "A" pot coexista fara sa se dea afara reciproc, insa nu la infinit.
+        + AVANTAJ fata de direct-mapped: mult mai putine conflict miss-uri (ai N
+          "sanse" in loc de una singura per set)
+        - DEZAVANTAJ fata de direct-mapped: hardware mai complex, trebuie comparate
+          N taguri simultan (dar doar N, nu toate liniile din cache, ca la
+          fully-associative) -- acces un pic mai lent, dar mult mai practic per total
+
+POLITICI DE SCRIERE (ce se intampla cand PROGRAMUL modifica o data care e in cache):
+
+    WRITE-THROUGH: de FIECARE data cand se scrie in cache, se scrie IMEDIAT si in
+        memoria principala (RAM), in paralel. 
+        + simplu, mereu CONSISTENT (RAM-ul e mereu la zi)
+        - mai LENT (fiecare scriere costa un acces la RAM, oricat de rapid e cache-ul)
+
+    WRITE-BACK: scrierea se face DOAR in cache (rapid!), si linia e marcata ca
+        "DIRTY" (murdara, modificata). Se scrie efectiv in RAM abia cand acea linie
+        e EVACUATA din cache (ca sa faca loc pentru altceva).
+        + mult mai RAPID (majoritatea scrierilor nu ating deloc RAM-ul)
+        - mai COMPLEX (trebuie tinut evidenta bitului "dirty" pentru fiecare linie)
+
+
+--------------------------------------------------------------------------------
+1.5 REPLACEMENT POLICIES (politici de inlocuire a paginilor/liniilor)
+--------------------------------------------------------------------------------
+
+CAND SE FOLOSESC: cand memoria (RAM sau cache) e PLINA si trebuie adus un bloc/
+pagina NOUA, sistemul TREBUIE sa aleaga ce EVACUEAZA (elimina) ca sa faca loc.
+Intrebarea centrala: CE alegem sa evacuam, ca sa minimizam sansa sa avem nevoie
+din nou de acel lucru in viitorul apropiat?
+
+OPTIMAL (algoritmul lui Belady)
+    IDEEA: evacueaza pagina care va fi folosita CEL MAI TARZIU in viitor (sau care
+    nu mai va fi folosita NICIODATA).
+    PROBLEMA: e IMPOSIBIL de implementat in realitate, pentru ca ar necesita sa
+    STII VIITORUL (ce va cere programul de acum inainte) -- ceva ce sistemul de
+    operare nu poate sti dinainte.
+    DE CE E FOLOSIT ATUNCI? Ca REFERINTA TEORETICA -- e limita superioara absoluta
+    de performanta pe care orice algoritm REAL ar putea, in cel mai bun caz, sa se
+    apropie de ea, dar niciodata sa o depaseasca. La examen, se cere de obicei doar
+    sa STII PRINCIPIUL, nu o implementare reala.
+
+FIFO (First In First Out)
+    IDEEA: evacueaza pagina care a fost ADUSA cea mai devreme in memorie -- 
+    indiferent daca a fost folosita ACUM 2 secunde sau nu a mai fost folosita de
+    mult. Practic, e ca o coada: prima pagina intrata e prima care iese.
+    + SIMPLU de implementat (doar o coada normala)
+    - PROBLEMA CIUDATA -- ANOMALIA LUI BELADY: la FIFO, in mod contraintuitiv, daca
+      DAI MAI MULTA memorie (mai multe frame-uri disponibile), NUMARUL de page
+      faults poate, de fapt, sa CREASCA (nu sa scada, cum te-ai astepta logic)!
+      Acest lucru NU se intampla la algoritmi mai "inteligenti" precum LRU.
+
+LRU (Least Recently Used) = "cel mai putin RECENT folosit"
+    IDEEA: evacueaza pagina care NU a fost folosita CEL MAI MULT TIMP (are cea
+    mai "veche" ultima utilizare). Se bazeaza EXACT pe principiul localitatii
+    temporale explicat mai sus la cache-uri: daca o pagina n-a fost folosita de
+    mult, probabil nici in viitorul apropiat nu va fi.
+    + Aproximeaza foarte BINE algoritmul OPTIMAL, in practica
+    - Implementarea EXACTA e costisitoare: ai nevoie sa tii evidenta EXACTA a
+      ORDINII de acces pentru fiecare pagina (ceea ce inseamna actualizari la
+      FIECARE acces la memorie) -- in practica se folosesc APROXIMARI (ex: cu
+      contoare de timp, sau prin algoritmul CLOCK descris mai jos)
+
+LFU (Least Frequently Used) = "cel mai rar folosit"
+    IDEEA: evacueaza pagina cu cel mai MIC numar TOTAL de accesari (nu neaparat
+    cea mai VECHE folosire, ca la LRU, ci cea folosita cel mai RAR per total).
+
+NRU (Not Recently Used) = "nefolosita recent"
+    IDEEA: o aproximare SIMPLA de implementat pentru LRU, folosind doar 2 biti per
+    pagina (deja mentionati la sectiunea 1.2, tabela de pagini):
+        R (Referenced) = a fost pagina ACCESATA recent?
+        M (Modified/dirty) = a fost pagina MODIFICATA (scrisa) de la ultima incarcare?
+
+    Cu acesti 2 biti, orice pagina se poate clasifica in exact 4 categorii (clase):
+        Clasa 0: R=0, M=0  (NU a fost folosita recent, SI nu e murdara) 
+                 -> CEA MAI BUNA de evacuat (nu se pierde nimic, nu trebuie scrisa
+                    inapoi pe disc, si nu era folosita recent oricum)
+        Clasa 1: R=0, M=1  (nu folosita recent, DAR e murdara -- trebuie scrisa
+                    pe disc inainte de evacuare, cost suplimentar)
+        Clasa 2: R=1, M=0  (folosita recent, dar curata)
+        Clasa 3: R=1, M=1  (folosita recent SI murdara) -> CEA MAI PROASTA alegere,
+                    se evita daca exista alta optiune in clasele 0-2
+
+    Algoritmul cauta, in ORDINE, prima clasa NEVIDA (care are cel putin o pagina in
+    ea), incepand de la clasa 0, si evacueaza o pagina din acea clasa.
+
+CLOCK (sau "Second Chance" = a doua sansa)
+    IDEEA: o modalitate EFICIENTA de a aproxima LRU, fara costul de a tine evidenta
+    exacta a ordinii de acces pentru fiecare pagina.
+    Toate paginile sunt aranjate CONCEPTUAL intr-un CERC (ca un ceas, de-aici numele),
+    cu un "AC" (pointer) care indica mereu o pagina anume. Fiecare pagina are UN
+    SINGUR bit R (referenced).
+
+    Cand e nevoie sa se evacueze o pagina:
+        1) Se verifica pagina INDICATA de ac chiar acum
+        2) DACA bitul R al acelei pagini e 0 -> se evacueaza EXACT acea pagina
+        3) DACA bitul R e 1 -> nu se evacueaza inca; i se DA O "A DOUA SANSA" (se
+           seteaza R la 0, ca sa fie candidat pentru evacuare LA URMATOAREA trecere
+           a acului, daca pana atunci nu mai e folosita), iar ACUL AVANSEAZA la
+           urmatoarea pagina din cerc si se repeta pasul 2
+
+    Practic, o pagina supravietuieste doar daca a fost ACCESATA intre 2 treceri
+    consecutive ale acului pe langa ea -- o aproximare buna si ieftina a LRU.
+
+RANDOM
+    IDEEA: evacueaza o pagina ALEASA COMPLET LA INTAMPLARE.
+    + extrem de SIMPLU (nu necesita nicio evidenta suplimentara)
+    - performanta e IMPREVIZIBILA -- cateodata buna, cateodata proasta, fara nicio
+      garantie
+
+
+--------------------------------------------------------------------------------
+1.6 FREE SPACE MANAGEMENT (gestiunea spatiului liber)
+--------------------------------------------------------------------------------
+
+CE PROBLEMA REZOLVA: cand un program cere memorie dinamica (ex: malloc), sau cand
+sistemul trebuie sa gaseasca loc pentru un proces nou, TREBUIE sa existe o modalitate
+de a sti EXACT ce parti din memorie sunt LIBERE (nefolosite) chiar acum.
+
+STRUCTURI DE DATE PENTRU A TINE EVIDENTA ZONELOR LIBERE:
+
+    BITMAP
+        IDEEA: se imparte memoria in bucati mici, EGALE (numite "unitati de
+        alocare"), si se tine un SINGUR VECTOR DE BITI, cu un bit pentru FIECARE
+        unitate: 0 = liber, 1 = ocupat.
+        + AVANTAJ: simplu, si e FOARTE RAPID sa cauti o zona CONTIGUA libera mare
+          (parcurgi bitii cautand secvente de 0-uri consecutive)
+        - DEZAVANTAJ: consuma spatiu PROPORTIONAL cu NUMARUL TOTAL de unitati din
+          toata memoria, INDIFERENT cate sunt de fapt libere in acel moment (chiar
+          daca memoria e 99% ocupata, bitmap-ul are TOT aceeasi dimensiune fixa)
+
+    LINKED LIST (lista inlantuita de zone libere)
+        IDEEA: fiecare zona LIBERA din memorie contine, la inceputul ei, un mic
+        "antet" cu dimensiunea zonei si un POINTER catre URMATOAREA zona liberia
+        din lista (zonele OCUPATE nu apar deloc in aceasta lista).
+        + AVANTAJ: consuma spatiu PROPORTIONAL cu NUMARUL de zone LIBERE existente
+          (nu cu dimensiunea totala a memoriei) -- mai eficient cand memoria e
+          majoritar ocupata (putine zone libere)
+        - DEZAVANTAJ: pentru a gasi o zona de dimensiune potrivita, trebuie
+          PARCURSA lista (mai lent decat bitmap-ul, mai ales daca sunt multe zone
+          libere mici, imprastiate)
+
+ALGORITMI DE ALOCARE (cand vine o cerere de dimensiune M, si avem o LISTA de zone
+libere disponibile, CARE zona alegem?):
+
+    FIRST FIT (prima potrivire)
+        IDEEA: parcurgi lista IN ORDINE si aloci din PRIMA zona care e suficient de
+        mare (>= M), fara sa mai cauti mai departe.
+        + AVANTAJ: RAPID -- te oprești imediat ce gasesti o zona buna
+        - DEZAVANTAJ: cu timpul, tinde sa "consume" si sa fragmenteze zonele de la
+          INCEPUTUL listei, lasand acolo multe resturi mici, in timp ce zonele mari
+          de la coada listei raman netouched mult timp
+
+    BEST FIT (cea mai buna potrivire)
+        IDEEA: parcurgi TOATA lista si aloci din cea MAI MICA zona care e totusi
+        SUFICIENT de mare (>= M) -- minimizezi risipa la ACEASTA alocare specifica.
+        + AVANTAJ: risipa MINIMA la fiecare alocare individuala
+        - DEZAVANTAJ: exact PENTRU CA minimizeaza risipa, tinde sa lase in urma
+          MULTE resturi FOARTE MICI (aproape inutilizabile pentru cereri viitoare),
+          plus trebuie parcursa INTREAGA lista de fiecare data (mai lent)
+
+    WORST FIT (cea mai proasta potrivire, ALES INTENTIONAT)
+        IDEEA: parcurgi TOATA lista si aloci din cea MAI MARE zona liberia
+        disponibila, indiferent cat de mare e cererea M.
+        + AVANTAJ TEORETIC: resturile ramase, dupa alocare, sunt mai MARI (teoretic
+          mai reutilizabile pentru viitor, fata de resturile mici de la Best Fit)
+        - DEZAVANTAJ: consuma RAPID toate zonele mari disponibile; cand vine o
+          cerere viitoare CU ADEVARAT mare, s-ar putea sa nu mai existe nicio zona
+          suficient de mare -- in practica, Worst Fit are, de obicei, performanta
+          SI fragmentarea CEA MAI PROASTA dintre cei 3 algoritmi (desi numele
+          "worst" nu se refera la calitatea algoritmului, ci la STRATEGIA aleasa:
+          "aleg mereu cea mai mare/proasta potrivire posibila ca dimensiune relativa")
+
+    EXEMPLU REZOLVAT PAS CU PAS -- Worst Fit:
+        Lista initiala de zone libere: 32, 44, 98
+        Cerere: malloc(33) -- prima data
+
+        Pas 1: cauti cea MAI MARE zona din lista -> e 98 (cea mai mare dintre 32,44,98)
+        Pas 2: aloci 33 din aceasta zona de 98 -> ramane 98 - 33 = 65 liber din ea
+        Pas 3: lista devine: 32, 44, 65
+
+        Cerere: malloc(33) -- a doua data
+
+        Pas 1: cauti cea mai mare zona din lista ACTUALIZATA -> e 65 (cea mai mare
+               dintre 32, 44, 65 acum)
+        Pas 2: aloci 33 din 65 -> ramane 65 - 33 = 32
+        Pas 3: lista devine: 32, 44, 32
+
+        RASPUNS FINAL: 32, 44, 32
+
+    BUDDY SYSTEM (sistemul "perechilor")
+        IDEEA: memoria e impartita RECURSIV in JUMATATI, mereu dimensiuni care sunt
+        PUTERI ALE LUI 2 (ex: 1024, 512, 256, 128...). O cerere de memorie e
+        ROTUNJITA la cea mai mica putere a lui 2 care o poate satisface complet.
+        Daca blocul disponibil e prea mare, se imparte in 2 "buddy" (jumatati egale),
+        si asa recursiv, pana ajunge la dimensiunea potrivita.
+        La ELIBERARE, daca cele 2 blocuri "buddy" (care au rezultat din impartirea
+        aceluiasi bloc parinte) sunt AMBELE libere in acelasi timp, ele se pot
+        RECOMBINA automat inapoi intr-un bloc mai mare (recursiv, in sus).
+        + AVANTAJ: recombinarea e RAPIDA si SIMPLA (se verifica direct blocul
+          "buddy" corespunzator, nu trebuie cautat prin toata memoria)
+        - DEZAVANTAJ: FRAGMENTARE INTERNA -- din cauza rotunjirii la puteri de 2,
+          se poate risipi spatiu (ex: o cerere de 130 e rotunjita la 256, risipind
+          126 de unitati)
+
+FRAGMENTARE -- DOUA TIPURI DIFERITE (foarte importanta distinctia la examen!):
+
+    FRAGMENTARE INTERNA
+        = spatiu care a fost ALOCAT unui proces, dar care NU e efectiv folosit de el
+        EXEMPLU: la paginare, ultima pagina a unui proces e aproape mereu doar
+        PARTIAL plina (procesul rareori are nevoie de un numar EXACT de pagini
+        complete) -- restul din ultima pagina e alocat, dar nefolosit = fragmentare
+        internă. La fel, la Buddy System, rotunjirea la puteri de 2.
+
+    FRAGMENTARE EXTERNA
+        = spatiu care e LIBER (NEALOCAT nimanui), dar imprastiat in bucati prea MICI
+        ca sa poata satisface o cerere noua, DESI suma TOTALA a bucatilor libere
+        ar fi, teoretic, suficienta
+        EXEMPLU: la segmentare (sau la malloc pe heap in general), dupa multe
+        alocari/eliberari, poti avea 3 zone libere de 10, 15 si 20 octeti (total
+        45 liberi), dar o cerere de 40 de octeti NU poate fi satisfacuta, pentru
+        ca NICIUNA dintre cele 3 zone, individual, nu e suficient de mare -- desi
+        SUMA lor ar fi suficienta
+
+
+
+################################################################################
+PARTEA 2: FILE SYSTEM
+################################################################################
+
+--------------------------------------------------------------------------------
+2.0 INTUITIA DE BAZA: CE E, DE FAPT, UN "FISIER" PENTRU SISTEMUL DE OPERARE?
+--------------------------------------------------------------------------------
+Cand salvezi un fisier pe disc, sistemul de operare trebuie sa retina 2 categorii
+de informatii, complet SEPARATE:
+
+    1) NUMELE fisierului si UNDE se afla in structura de directoare (ex: 
+       /home/user/poza.jpg) -- aceasta informatie e stocata in DIRECTOARE (care,
+       la randul lor, sunt un tip special de "fisier" ce contine o lista de
+       perechi (nume -> numar de inode))
+
+    2) TOATE CELELALTE informatii despre fisier (marime, permisiuni, cand a fost
+       modificat, si mai important, UNDE se afla EFECTIV datele lui pe disc) --
+       aceasta informatie e stocata intr-o structura separata numita INODE
+
+De ce se face aceasta SEPARARE (numele in director, restul in inode)? Pentru ca
+astfel POTI avea MAI MULTE NUME (din locuri diferite) care sa se refere la EXACT
+ACELASI fisier (continut identic) -- exact asta e ideea de HARD LINK, explicata
+mai jos.
+
+--------------------------------------------------------------------------------
+2.1 LINUX INODE
+--------------------------------------------------------------------------------
+
+DEFINITIE: inode (index node) = o structura de date care contine TOATE metadatele
+unui fisier, CU O SINGURA EXCEPTIE: numele fisierului NU e stocat aici (e stocat
+in director, ca explicat mai sus).
+
+CE CONTINE EFECTIV UN INODE (lista completa):
+    - TIPUL fisierului: e un fisier obisnuit (regular)? un director? un link
+      simbolic? un FIFO? un device (echipament)?
+    - PERMISIUNI: cine poate citi/scrie/executa acest fisier (owner, grup, ceilalti)
+    - OWNER (UID) si GROUP (GID): cui apartine fisierul
+    - DIMENSIUNEA fisierului, in octeti
+    - TIMESTAMPS (marci de timp): 
+        * atime = cand a fost ACCESAT (citit) ultima data
+        * mtime = cand a fost MODIFICAT (continutul) ultima data
+        * ctime = cand s-a schimbat ultima data INODE-UL insusi (ex: s-au schimbat
+                  permisiunile, sau owner-ul -- NU neaparat continutul)
+    - LINK COUNT: un NUMAR care spune de CATE NUME diferite (hard links, vezi mai
+      jos) e "referentiat" acest inode chiar acum
+    - POINTERI CATRE BLOCURILE DE DATE EFECTIVE (aici e stocat continutul REAL al
+      fisierului, pe disc) -- impartiti in 4 categorii:
+
+        * cativa POINTERI DIRECTI (sa zicem D la numar) -- FIECARE dintre acesti
+          pointeri indica DIRECT catre UN bloc de date pe disc. Simplu si rapid,
+          dar limitat: cu D pointeri directi, poti adresa direct doar D blocuri.
+
+        * UN pointer INDIRECT SIMPLU -- acesta NU indica direct catre date, ci
+          catre UN BLOC INTREG plin cu ALTI POINTERI, care ACEIA indica, la randul
+          lor, direct catre blocuri de date. Daca un bloc are B octeti si o
+          adresa/pointer ocupa A octeti, atunci un astfel de bloc "de pointeri"
+          poate contine B/A pointeri -> adreseaza B/A blocuri de date suplimentare.
+
+        * UN pointer INDIRECT DUBLU -- indica catre un bloc plin de pointeri, dar
+          FIECARE dintre ACEI pointeri indica, la randul lui, catre UN ALT bloc
+          plin de pointeri (nivelul de mai sus, indirect simplu), care ABIA ATUNCI
+          indica spre blocuri de date reale. Deci adreseaza (B/A) * (B/A) = (B/A)^2
+          blocuri de date.
+
+        * UN pointer INDIRECT TRIPLU -- acelasi principiu, cu un nivel suplimentar
+          de indirectare -> adreseaza (B/A)^3 blocuri de date.
+
+FORMULA DIMENSIUNII MAXIME A UNUI FISIER (de retinut, apare des la examen):
+    Daca avem D pointeri directi, bloc de B octeti, adresa de A octeti:
+
+        Dimensiune_maxima = B * ( D + (B/A) + (B/A)^2 + (B/A)^3 )
+
+    (se inmulteste cu B la final pentru ca fiecare "bloc adresabil" are B octeti;
+    suma din paranteza e NUMARUL TOTAL de blocuri adresabile prin toate cele 4
+    categorii de pointeri combinate)
+
+    EXEMPLU NUMERIC: daca D=12, bloc B=4096 octeti, adresa A=4 octeti:
+        B/A = 4096/4 = 1024
+        Numar total de blocuri = 12 + 1024 + 1024^2 + 1024^3 
+                                = 12 + 1024 + 1.048.576 + 1.073.741.824 
+                                ≈ 1.073.742.436 blocuri
+        Dimensiune maxima ≈ 1.073.742.436 * 4096 octeti (un numar FOARTE mare, in TB)
+
+HARD LINK vs SYMBOLIC LINK (diferenta esentiala, foarte des la examen):
+
+    HARD LINK:
+        = o intrare de DIRECTOR (un nume nou) care pointeaza catre EXACT ACELASI
+          numar de inode ca un alt nume existent
+        = practic, ai 2 (sau mai multe) NUME DIFERITE pentru EXACT ACELASI fisier
+          (acelasi continut, aceleasi metadate, ACELASI inode -- nu e o copie!)
+        RESTRICTII: 
+            - NU poate exista un hard link catre un fisier de pe O ALTA PARTITIE
+              (motivul: inode-urile sunt NUMERE care au sens doar in interiorul
+              ACELUIASI filesystem/partitie -- inode-ul numarul 500 de pe partitia
+              1 nu are nicio legatura cu inode-ul numarul 500 de pe partitia 2)
+            - de obicei NU se poate crea hard link catre un DIRECTOR (ca sa se
+              evite complicatii/cicluri in structura de directoare)
+        CE SE INTAMPLA CAND STERGI UNUL DIN NUMELE (hard link-urile)?
+            Doar se SCADE link count-ul inode-ului cu 1, si se elimina acea
+            intrare de director. DATELE NU SE STERG, pentru ca inca mai exista
+            alte nume (hard link-uri) care pointeaza catre acelasi inode. Datele
+            (si inode-ul) sunt EFECTIV eliberate doar cand link count-ul ajunge
+            la 0 (adica s-au sters TOATE numele posibile).
+
+    SYMBOLIC LINK (soft link):
+        = un fisier COMPLET SEPARAT (cu PROPRIUL inode!), care nu contine "date"
+          normale, ci CONTINE CA CONTINUT calea (adresa/path) catre alt fisier
+        = poate trece intre PARTITII diferite (pentru ca e doar un text, o cale,
+          nu depinde de numere de inode)
+        = poate puncta catre DIRECTOARE, fara restrictii
+        - PROBLEMA: daca fisierul TINTA (catre care pointeaza) e sters sau mutat,
+          linkul simbolic RAMANE (fisierul lui separat continua sa existe), dar
+          devine "BROKEN" / "dangling" (rupt) -- pointeaza catre ceva care nu
+          mai exista
+
+--------------------------------------------------------------------------------
+2.2 SUPERBLOCK
+--------------------------------------------------------------------------------
+
+DIFERENTA FATA DE INODE: inode-ul contine informatii despre UN SINGUR fisier.
+SUPERBLOCK-UL contine informatii despre INTREGUL FILESYSTEM (toata partitia/discul),
+o singura copie (sau cateva copii de siguranta) pentru tot filesystemul.
+
+CE CONTINE UN SUPERBLOCK:
+    - TIPUL de filesystem (ext4, NTFS, etc.)
+    - DIMENSIUNEA totala a filesystemului
+    - DIMENSIUNEA unui bloc (ex: 4KB)
+    - numarul TOTAL de i-noduri, si numarul de i-noduri LIBERE (nefolosite inca)
+    - numarul TOTAL de blocuri de date, si numarul de blocuri LIBERE
+    - informatii despre MONTARE (mount status -- e filesystemul montat curent?)
+    - POINTERI catre structurile care gestioneaza spatiul liber (de exemplu,
+      bitmap-uri care arata care i-noduri/blocuri sunt libere -- vezi sectiunea
+      1.6 de mai sus, aceleasi concepte de "free space management" se aplica si
+      aici, la nivel de disc, nu doar la RAM)
+
+--------------------------------------------------------------------------------
+2.3 RAID (Redundant Array of Independent Disks)
+--------------------------------------------------------------------------------
+
+IDEEA GENERALA: in loc de UN disc singur, folosesti MAI MULTE discuri IMPREUNA,
+ca sa obtii FIE viteza mai mare, FIE siguranta mai mare (protectie impotriva
+defectarii unui disc), FIE ambele -- in functie de "nivelul" RAID ales. Fiecare
+nivel RAID e o strategie DIFERITA de a combina discurile.
+
+RAID 0 -- STRIPING (impartire), FARA NICIO REDUNDANTA
+    CUM FUNCTIONEAZA: datele sunt IMPARTITE (striped) intre N discuri -- de exemplu,
+    primul "bloc" de date pe discul 1, al doilea bloc pe discul 2, al treilea pe
+    discul 3, etc., in mod ROTATIV. NU exista NICIO copie de siguranta.
+    PERFORMANTA: EXCELENTA -- pentru ca se poate citi/scrie in PARALEL pe TOATE
+        discurile simultan (fiecare disc face doar 1/N din munca)
+    FIABILITATE: FOARTE PROASTA -- daca UN SINGUR disc, dintre cele N, se
+        defecteaza, se PIERD TOATE datele (pentru ca fiecare fisier era, de fapt,
+        impartit intre toate discurile, deci lipsa unei bucati face tot inutilizabil)
+    Capacitate UTILA = N * capacitate_disc (100% din spatiul total e utilizabil,
+        NIMIC nu e "sacrificat" pentru siguranta -- de-aici si riscul mare)
+
+RAID 1 -- MIRRORING (oglindire)
+    CUM FUNCTIONEAZA: datele sunt DUPLICATE IDENTIC pe 2 (sau mai multe) discuri --
+    fiecare disc are, la un moment dat, EXACT aceleasi date ca celelalte.
+    FIABILITATE: FOARTE BUNA -- daca se defecteaza N-1 discuri (toate, cu exceptia
+        unuia), datele SUNT INCA disponibile pe discul ramas
+    Capacitate UTILA = capacitate_UNUI_disc (indiferent cate discuri ai, capacitatea
+        totala vizibila e egala cu a UNUI SINGUR disc, pentru ca restul sunt copii
+        identice, nu spatiu suplimentar)
+    PERFORMANTA la SCRIERE: NU e mai rapida decat un singur disc (fiecare bit trebuie
+        scris pe TOATE copiile, deci scrierea e limitata de discul cel mai lent)
+    PERFORMANTA la CITIRE: poate fi mai RAPIDA (sistemul poate citi de pe ORICARE
+        din copii, alegand-o pe cea mai putin ocupata la momentul respectiv)
+
+RAID 4 -- PARITATE DEDICATA
+    CUM FUNCTIONEAZA: datele sunt impartite (striped, ca la RAID 0) pe N-1 discuri,
+    PLUS UN DISC SEPARAT, dedicat EXCLUSIV pentru a tine PARITATEA (o valoare
+    calculata cu operatia XOR intre datele corespunzatoare de pe celelalte discuri).
+    DE CE AJUTA PARITATEA: daca UN disc (oricare, inclusiv chiar discul de paritate)
+    se defecteaza, continutul lui poate fi RECONSTRUIT folosind datele de pe
+    CELELALTE discuri PLUS paritatea (proprietatea matematica a XOR permite asta).
+    PROBLEMA (bottleneck): discul de PARITATE e implicat la FIECARE scriere,
+        INDIFERENT pe care din celelalte discuri s-a scris efectiv -- pentru ca
+        paritatea trebuie MEREU recalculata si actualizata. Asta face din discul
+        de paritate un PUNCT DE CONGESTIE (bottleneck) la scrieri concurente
+        (multiple scrieri simultane pe discuri DIFERENTE de date tot "se bat" pe
+        acelasi disc unic de paritate).
+    Capacitate UTILA = (N-1) * capacitate_disc (echivalentul unui disc e "sacrificat"
+        pentru paritate)
+
+RAID 5 -- PARITATE DISTRIBUITA (rezolva problema de la RAID 4)
+    CUM FUNCTIONEAZA: la fel ca RAID 4 (paritate calculata cu XOR, poate reconstrui
+    un disc defect), DAR paritatea NU e pe UN disc dedicat, ci e DISTRIBUITA
+    ROTATIV, pe RAND, pe TOATE discurile (pentru un "rand" de date, paritatea e pe
+    discul 1; pentru randul urmator, paritatea e pe discul 2; si asa mai departe).
+    AVANTAJUL fata de RAID 4: elimina bottleneck-ul discului unic de paritate --
+        pentru ca scrierile concurente pe blocuri DIFERENTE ajung, in medie, sa
+        actualizeze paritatea pe discuri DIFERENTE (nu toate pe acelasi unic disc),
+        deci se pot face in PARALEL, fara sa se "bata" pe aceeasi resursa
+    Capacitate UTILA = (N-1) * capacitate_disc (la fel ca RAID 4 -- tot echivalentul
+        unui disc e "consumat" pentru paritate, doar ca e imprastiat pe toate)
+    TOLERANTA: poate supravietui defectarii unui SINGUR disc (la fel ca RAID 4)
+
+RAID 6 -- PARITATE DUBLA
+    CUM FUNCTIONEAZA: la fel ca RAID 5, dar cu DOUA seturi de paritate distribuite,
+    calculate DIFERIT (de obicei folosind coduri Reed-Solomon, mai complexe decat
+    simplul XOR de la RAID 4/5).
+    AVANTAJ fata de RAID 5: poate supravietui defectarii SIMULTANE a 2 discuri
+        (nu doar unul singur, ca la RAID 5)
+    Capacitate UTILA = (N-2) * capacitate_disc (echivalentul a DOUA discuri e
+        "consumat" pentru cele doua seturi de paritate)
+
+RAID 10 (se scrie si "1+0") -- COMBINATIA de MIRROR + STRIPE
+    CUM FUNCTIONEAZA: discurile sunt grupate INTAI in PERECHI, fiecare pereche
+    fiind OGLINDITA intre ele (ca la RAID 1). APOI, peste aceste perechi (tratate
+    ca unitati), se face STRIPING (ca la RAID 0).
+    AVANTAJ: combina VITEZA buna a RAID 0 (striping intre perechi) CU siguranta
+        buna a RAID 1 (fiecare pereche e oglindita) -- poate supravietui defectarii
+        MAI MULTOR discuri simultan, ATATA TIMP CAT nu se defecteaza AMBELE discuri
+        din ACEEASI pereche oglindita in acelasi timp
+    Capacitate UTILA = (N/2) * capacitate_disc (jumatate din capacitatea totala,
+        pentru ca fiecare pereche "pierde" jumatate din spatiu prin oglindire)
+
+EXEMPLU REZOLVAT: RAID 5 cu 5 discuri de 2TB fiecare -- ce capacitate utila rezulta?
+    Capacitate_utila = (N - 1) * capacitate_disc = (5 - 1) * 2TB = 4 * 2TB = 8TB
+    (echivalentul UNUI disc, din cele 5, e "consumat" de paritatea distribuita,
+    desi paritatea insasi e imprastiata pe toate cele 5 discuri fizic)
